@@ -131,7 +131,7 @@ function Brand() {
   return (
     <div className="brand">
       <span className="brand-mark"><Icon name="sparkle" size={18} /></span>
-      <span className="brand-name">Alma</span>
+      <span className="brand-name">Leo Messi</span>
       <span className="brand-sub">ESTÉTICA</span>
     </div>
   );
@@ -204,7 +204,7 @@ function ClientApp({ openAdmin, logout }: { openAdmin: () => void; logout: () =>
         <nav className="main-nav" aria-label="Navegación principal">
           <button className="nav-link active">Reservar turno</button>
           <button className="nav-link" onClick={logout}>Cerrar sesión</button>
-          <button className="nav-link" onClick={openAdmin}>Administración</button>
+          {/* <button className="nav-link" onClick={openAdmin}>Administración</button> */}
         </nav>
         <div className="user-menu">
           <span className="user-copy"><strong>Hola, Martina</strong><small>Mi cuenta</small></span>
