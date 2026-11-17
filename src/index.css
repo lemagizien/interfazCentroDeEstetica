@@ -1,6 +1,7 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&&display=swap");
 /* @import "tailwindcss"; */
 
+/* Paleta y tokens globales */
 :root {
   --ink: #302b2a;
   --muted: #817874;
@@ -20,6 +21,7 @@
   --shadow: 0 18px 50px rgba(72, 57, 50, 0.1);
 }
 
+/* Base y normalización */
 * { box-sizing: border-box; }
 html {scrollbar-gutter: stable;}
 body { margin: 0; min-width: 320px; background: var(--paper); color: var(--ink); font-family: "DM Sans", sans-serif; }
@@ -28,6 +30,7 @@ button:focus-visible { outline: 3px solid rgba(200, 110, 90, .28); outline-offse
 h1, h2, h3, p { margin: 0; }
 button { cursor: pointer; }
 
+/* Inicio de sesión y registro de propietarios */
 .login-page { min-height: 100vh; display: grid; grid-template-columns: minmax(420px, 1.1fr) minmax(420px, 0.9fr); background: var(--white); }
 .login-visual { min-height: 100vh; padding: 36px max(5vw, 45px); position: relative; display: flex; flex-direction: column; justify-content: flex-start; overflow: hidden; color: var(--white); background: linear-gradient(180deg, rgba(48,43,42,.15), rgba(48,43,42,.68)), url("https://images.unsplash.com/photo-1719760518176-e124a5bcd025?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHw0fHxsdXh1cnklMjBiZWF1dHklMjBzYWxvbiUyMHNraW5jYXJlJTIwdHJlYXRtZW50JTIwd2FybSUyMGJlaWdlJTIwaW50ZXJpb3J8ZW58MXx8fHwxNzkxMjQxNDc0fDA&ixlib=rb-4.1.0&q=80&w=1080") center/cover; }
 .login-brand .brand-mark { border-color: rgba(255,255,255,.7); color: var(--white); }
@@ -66,6 +69,7 @@ button { cursor: pointer; }
 .register-prompt a { border: 0; background: transparent; padding: 0; color: var(--coral); font-weight: 600; }
 .login-note { display: block; text-align: center; color: #aaa09b; font-size: 11px; margin-top: 10px; }
 
+/* Acceso restringido de superadmin */
 .superadmin-login-page { min-height: 100vh; display: grid; place-items: center; padding: 32px 20px; background: radial-gradient(ellipse at top, #f3ede6 0%, var(--paper) 60%); }
 .superadmin-login-card { width: min(100%, 470px); padding: 38px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); box-shadow: var(--shadow); }
 .superadmin-login-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 27px; border-bottom: 1px solid var(--line); }
@@ -83,6 +87,7 @@ button { cursor: pointer; }
 .superadmin-login-message { min-height: 18px; margin-top: 12px; color: var(--coral-dark); font-size: 12px; text-align: center; }
 .superadmin-login-footer { margin-top: 15px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; text-align: center; }
 
+/* Navegación, marca y elementos compartidos */
 .topbar { height: 78px; background: rgba(255,255,255,.95); border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 max(5vw, 30px); position: relative; z-index: 5; }
 .brand { display: flex; align-items: center; width: fit-content; }
 .brand-mark { width: 33px; height: 33px; display: grid; place-items: center; border: 1px solid var(--coral); border-radius: 50%; color: var(--coral); margin-right: 10px; }
@@ -100,6 +105,7 @@ button { cursor: pointer; }
 .avatar-2 { background: #c5d3ca; color: #476257; }
 .avatar-3 { background: #d8cbd9; color: #665368; }
 
+/* Página pública de reserva */
 .hero { min-height: 405px; display: grid; grid-template-columns: 47% 53%; background: var(--cream); overflow: hidden; }
 .hero-copy { padding: 67px 7vw 50px max(7vw, 50px); align-self: center; }
 .eyebrow { color: var(--coral); font-size: 10px; letter-spacing: 2px; font-weight: 700; display: flex; align-items: center; gap: 7px; }
@@ -118,6 +124,7 @@ button { cursor: pointer; }
 .hero-card small { color: var(--muted); margin-top: 2px; }
 .availability-dot { width: 9px; height: 9px; background: var(--green); border-radius: 50%; box-shadow: 0 0 0 4px var(--green-soft); }
 
+/* Selección de servicio, profesional, fecha y horario */
 .booking-section { max-width: 1280px; margin: auto; padding: 72px 40px 85px; }
 .section-heading { display: flex; justify-content: space-between; align-items: end; margin-bottom: 38px; }
 .section-heading small, .summary-label { font-size: 9px; letter-spacing: 2px; color: var(--coral); font-weight: 700; }
@@ -156,6 +163,8 @@ button { cursor: pointer; }
 .slots { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
 .slots button { height: 36px; border: 1px solid var(--line); border-radius: 6px; background: var(--white); font-size: 10px; transition: .2s ease; }
 .slots button.selected { color: var(--coral); background: var(--coral-soft); border-color: var(--coral); font-weight: 700; }
+
+/* Resumen de reserva y pie de página */
 .summary-card { position: sticky; top: 25px; background: var(--white); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 25px; }
 .summary-service { display: flex; align-items: center; gap: 12px; padding: 22px 0; border-bottom: 1px solid var(--line); }
 .summary-service strong { font-size: 13px; }
@@ -172,6 +181,7 @@ button { cursor: pointer; }
 .summary-help svg { color: var(--green); }
 footer { height: 85px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 0 max(5vw, 30px); color: var(--muted); font-size: 10px; background: var(--white); }
 
+/* Panel administrativo */
 .admin-app { min-height: 100vh; display: grid; grid-template-columns: 225px minmax(0,1fr); background: #f6f4f1; }
 .sidebar { background: var(--white); border-right: 1px solid var(--line); padding: 25px 17px 20px; display: flex; flex-direction: column; min-height: 100vh; position: sticky; top: 0; height: 100vh; }
 .sidebar > .brand { margin: 0 12px 25px; }
@@ -195,6 +205,8 @@ footer { height: 85px; border-top: 1px solid var(--line); display: flex; align-i
 .admin-profile > span:first-child { display: flex; flex-direction: column; text-align: right; }
 .mobile-menu { display: none; }
 .admin-content { padding: 31px 35px 45px; max-width: 1400px; margin: auto; }
+
+/* Métricas, agenda, equipo y acciones rápidas */
 .welcome { display: flex; align-items: end; justify-content: space-between; margin-bottom: 25px; }
 .welcome h2 { font: 600 27px , DM Sans, serif; }
 .welcome p { font-size: 11px; color: var(--muted); margin-top: 5px; }
@@ -244,6 +256,7 @@ footer { height: 85px; border-top: 1px solid var(--line); display: flex; align-i
 .quick-actions button strong { font-size: 8px; align-self: end; }
 .quick-actions button small { font-size: 7px; color: var(--muted); }
 
+/* Adaptación a tablet y pantallas medianas */
 @media (max-width: 1000px) {
   .main-nav { display: none; }
   .topbar { grid-template-columns: 1fr 1fr; }
@@ -256,6 +269,7 @@ footer { height: 85px; border-top: 1px solid var(--line); display: flex; align-i
   .quick-actions > span { grid-column: 1 / -1; }
 }
 
+/* Adaptación a móviles */
 @media (max-width: 840px) {
   .login-page { display: block; }
   .login-visual { display: none; }
@@ -290,6 +304,7 @@ footer { height: 85px; border-top: 1px solid var(--line); display: flex; align-i
   .quick-actions > span { grid-column: auto; }
 }
 
+/* Ajustes para móviles pequeños */
 @media (max-width: 440px) {
   .hero h1 { font-size: 40px; }
   .metrics { grid-template-columns: 1fr; }

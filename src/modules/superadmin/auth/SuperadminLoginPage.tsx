@@ -1,11 +1,11 @@
-import { useState, type FormEvent } from "react";
+import { useState, type SubmitEvent } from "react";
 import { Brand } from "../../../components/Brand";
 import { Icon } from "../../../components/Icon";
 
 export const SuperadminLoginPage = () => {
   const [message, setMessage] = useState("");
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setMessage("El acceso todavía no está conectado al servicio de autenticación.");
   };
