@@ -1,21 +1,20 @@
 // src/modules/auth/LoginView.tsx
-import { Brand } from "../../components/Brand";
-import { Icon } from "../../components/Icon";
-import { SignUpForm } from "./components/SingUpForm";
+import { Brand } from "../../../components/Brand";
+import { Icon } from "../../../components/Icon";
+import { SignUpForm } from "./components/SignUpForm";
 import { LoginForm } from "./components/LoginForm";
 import { useLocation } from "react-router-dom";
 
 // Interface para declarar de forma limpia el contrato de props
-interface AuthViewProps {
+interface OwnerAuthPageProps {
   enter: (role: "client" | "owner") => void;
 }
 
-export const AuthView = ({ enter }: AuthViewProps) => {
+export const OwnerAuthPage = ({ enter }: OwnerAuthPageProps) => {
   const location = useLocation();
-  //const navigate = useNavigate();
 
   // Se determina la vista según la URL activa (/signup vs /login)
-  const isSignUp = location.pathname === "/singup";
+  const isSignUp = location.pathname === "/signup";
 
   return (
     <main className="login-page">
@@ -32,7 +31,7 @@ export const AuthView = ({ enter }: AuthViewProps) => {
             <li>Panel intuitivo</li>
           </ul>
         </div>
-        <small className="photo-credit">Puto el que lee</small>
+        {/* <small className="photo-credit"> © 2025 Alma Estética </small> */}
       </section>
 
       <section className="login-form-wrap">
@@ -42,6 +41,7 @@ export const AuthView = ({ enter }: AuthViewProps) => {
           <SignUpForm
             onSubmit={() => enter("client")}
           />
+          
         ) : (
           <>
             <LoginForm
@@ -52,6 +52,7 @@ export const AuthView = ({ enter }: AuthViewProps) => {
             </button>
           </>
         )}
+        <small className="login-copyrigth">© 2026 MiCentro. Todos los derechos reservados.</small>
       </section>
     </main>
   );

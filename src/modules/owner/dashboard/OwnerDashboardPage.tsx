@@ -1,15 +1,18 @@
 // src/modules/owner/OwnerDashboardView.tsx
 import { useState } from "react";
-import { Brand } from "../../components/Brand";
-import { Icon, IconName } from "../../components/Icon";
+import { Brand } from "../../../components/Brand";
+import { Icon, IconName } from "../../../components/Icon";
 import { appointments } from "@/data/mockAppointments";
-import { professionals } from "@/data/mockProfessionals";
+import { MOCK_ALMAESTETICA } from "@/data/mockBusiness";
 
 interface OwnerDashboardViewProps {
   onLogout: () => void;
 }
 
-export const OwnerDashboardView = ({ onLogout }: OwnerDashboardViewProps) => {
+export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
+  const business = MOCK_ALMAESTETICA[0];
+  const professionals = business.professionals;
+
   const [active, setActive] = useState("Resumen");
 
   const nav = [

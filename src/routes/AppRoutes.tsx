@@ -1,52 +1,43 @@
 import { useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import { AuthView } from "../modules/auth/AuthView";
-import { ClientBookingView } from "../modules/client/ClientBookingView";
-import { OwnerDashboardView } from "../modules/owner/OwnerDashboardView";
+import { OwnerAuthPage } from "../modules/owner/auth/OwnerAuthPage";
+import { ClientBookingPage } from "../modules/client/ClientBookingPage";
+import { OwnerDashboardPage } from "../modules/owner/dashboard/OwnerDashboardPage";
 
 export const AppRoutes = () => {
-  const [role, setRole] = useState<"client" | "owner" | null>(null);
+  const [isOwnerAuthenticated, setIsOwnerAuthenticated] = useState(false);
   const navigate = useNavigate();
 
-  const handleEnter = (selectedRole: "client" | "owner") => {
-    setRole(selectedRole);
-    navigate(selectedRole === "owner" ? "/owner" : "/client");
+  const handleOwnerEnter = () => {
+    setIsOwnerAuthenticated(true);
+    navigate("/owner");
   };
 
-  const handleLogout = () => {
-    setRole(null);
+  const handleOwnerLogout = () => {
+    setIsOwnerAuthenticated(false);
     navigate("/login");
   };
 
   return (
     <Routes>
+      {/* 1. Rutas exclusivas de Owners */}
       <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="/login" element={<AuthView enter={handleEnter} />} />
-      <Route path="/singup" element={<AuthView enter={handleEnter} />} />
+      <Route path="/login" element={<OwnerAuthPage enter={handleOwnerEnter} />} />
+      <Route path="/signup" element={<OwnerAuthPage enter={handleOwnerEnter} />} />
 
       <Route
-        path="/client"
+        path="/owner/*"
         element={
-          role === "client" ? (
-            <ClientBookingView onLogout={handleLogout} />
+          isOwnerAuthenticated ? (
+            <OwnerDashboardPage onLogout={handleOwnerLogout} />
           ) : (
             <Navigate to="/login" replace />
           )
         }
       />
 
-      <Route
-        path="/owner"
-        element={
-          role === "owner" ? (
-            <OwnerDashboardView onLogout={handleLogout} />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      {/* 2. Ruta pública dinámica para cada negocio y sus clientes */}
+      <Route path="/:businessSlug" element={<ClientBookingPage />} />
     </Routes>
   );
 };

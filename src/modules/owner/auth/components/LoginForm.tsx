@@ -22,7 +22,7 @@ export const LoginForm = ({ onSubmit }: LoginFormProps) => {
 
       <label>
         <span>Contraseña</span>
-        <input type="password" placeholder="Mínimo 8 caracteres." />
+        <input type="password" placeholder="********" />
         <p><button type="button">¿Olvidaste tu contraseña?</button></p>
       </label>
 
@@ -32,7 +32,7 @@ export const LoginForm = ({ onSubmit }: LoginFormProps) => {
 
       <p className="register-prompt">
         ¿Todavía no tenés cuenta?{" "}
-        <Link className="change-form" to="/singup">Registrarse gratis</Link>
+        <Link className="change-form" to="/signup">Registrarse gratis</Link>
       </p>
     </div>
   );

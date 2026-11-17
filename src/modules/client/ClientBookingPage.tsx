@@ -1,26 +1,50 @@
 // src/modules/client/ClientBookingView.tsx
 import { useState } from "react";
+import { useParams } from "react-router-dom";
 import { Brand } from "../../components/Brand";
 import { Icon } from "../../components/Icon";
-import { services } from "@/data/mockServices";
-import { professionals } from "@/data/mockProfessionals";
-import { booking } from "@/data/mockBooking";
+import { MOCK_ALMAESTETICA } from "@/data/mockBusiness";
+import { ClientAuthModal } from "./components/ClientAuthModal";
+import { ClientUser } from "./types/ClientUser";
 
 const slots = ["10:30", "11:30", "14:00", "16:30"];
 
-interface ClientBookingViewProps {
-  onLogout: () => void;
-}
+export const ClientBookingPage = () => {
+  const { businessSlug } = useParams<{ businessSlug: string }>();
 
-export const ClientBookingView = ({ onLogout }: ClientBookingViewProps) => {
+  const [clientUser, setClientUser] = useState<ClientUser | null>(null);
+
+  // Estado del modal (boolean):
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
   const [service, setService] = useState(1);
   const [professional, setProfessional] = useState(1);
   const [date, setDate] = useState(0);
   const [time, setTime] = useState("10:30");
   const [confirmed, setConfirmed] = useState(false);
 
-  const selectedService = services.find((item) => item.id === service) || services[0];
-  const selectedProfessional = professionals.find((item) => item.id === professional) || professionals[0];
+  const business = MOCK_ALMAESTETICA.find((b) => b.slug === businessSlug);
+
+  if (!business) {
+    return (
+      <div className="client-app" style={{ padding: "4rem 2rem", textAlign: "center" }}>
+        <h2>Negocio no encontrado</h2>
+        <p>La dirección "/{businessSlug}" no corresponde a ningún centro activo.</p>
+      </div>
+    );
+  }
+
+  const selectedService = business.services.find((item) => item.id === service) || business.services[0];
+  const selectedProfessional = business.professionals.find((item) => item.id === professional) || business.professionals[0];
+
+  // Handler para confirmar turno:
+  const handleConfirmClick = () => {
+    if (!clientUser) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+    setConfirmed(true);
+  };
 
   return (
     <div className="client-app">
@@ -28,13 +52,34 @@ export const ClientBookingView = ({ onLogout }: ClientBookingViewProps) => {
         <Brand />
         <nav className="main-nav" aria-label="Navegación principal">
           <button className="nav-link active">Reservar turno</button>
-          <button className="nav-link" onClick={onLogout}>Cerrar sesión</button>
+          {clientUser && (
+            <button
+              className="nav-link"
+              onClick={() => {
+                setClientUser(null);
+                setConfirmed(false);
+              }}
+            >
+              Cerrar sesión
+            </button>
+          )}
         </nav>
-        <div className="user-menu">
-          <span className="user-copy"><strong>Hola, Martina</strong><small>Mi cuenta</small></span>
-          <span className="avatar avatar-small">MM</span>
-          <Icon name="chevron" size={15} />
-        </div>
+
+        {clientUser ? (
+          <div className="user-menu">
+            <span className="user-copy">
+              <strong>Hola, {clientUser.name}</strong>
+              <small>Mi cuenta</small>
+            </span>
+            <span className="avatar avatar-small">{clientUser.initials}</span>
+            <Icon name="chevron" size={15} />
+          </div>
+        ) : (
+          /* Se abre el modal en vez de logear directo */
+          <button className="nav-link" onClick={() => setIsAuthModalOpen(true)}>
+            Iniciar sesión
+          </button>
+        )}
       </header>
 
       <main>
@@ -70,7 +115,7 @@ export const ClientBookingView = ({ onLogout }: ClientBookingViewProps) => {
                   <span><h3>Elegí un servicio</h3><p>¿Qué te gustaría hacerte?</p></span>
                 </div>
                 <div className="service-grid">
-                  {services.map((item) => (
+                  {business.services.map((item) => (
                     <button
                       key={item.id}
                       className={`service-card ${service === item.id ? "selected" : ""}`}
@@ -79,7 +124,7 @@ export const ClientBookingView = ({ onLogout }: ClientBookingViewProps) => {
                       {service === item.id && <span className="selected-check"><Icon name="check" size={13} /></span>}
                       <span className="service-icon"><Icon name={item.icon} /></span>
                       <span className="service-info"><strong>{item.name}</strong><small>{item.detail}</small></span>
-                      <span className="service-meta"><strong>{item.price}</strong><small><Icon name="clock" size={13} /> {item.time}</small></span>
+                      <span className="service-meta"><strong>{item.price}</strong><small><Icon name="clock" size={13} /> {item.duration}</small></span>
                     </button>
                   ))}
                 </div>
@@ -91,7 +136,7 @@ export const ClientBookingView = ({ onLogout }: ClientBookingViewProps) => {
                   <span><h3>Elegí un profesional</h3><p>Todos son especialistas en este servicio.</p></span>
                 </div>
                 <div className="professional-row">
-                  {professionals.map((item, index) => (
+                  {business.professionals.map((item, index) => (
                     <button
                       key={item.id}
                       className={`professional-card ${professional === item.id ? "selected" : ""}`}
@@ -111,7 +156,7 @@ export const ClientBookingView = ({ onLogout }: ClientBookingViewProps) => {
                   <span><h3>Elegí día y horario</h3><p>Horarios disponibles para {selectedProfessional.name.split(" ")[0]}.</p></span>
                 </div>
                 <div className="date-row">
-                  {booking.map((item, index) => (
+                  {business.booking.map((item, index) => (
                     <button key={item.number} onClick={() => setDate(index)} className={`date-card ${date === index ? "selected" : ""}`}>
                       <small>{item.day}</small><strong>{item.number}</strong><span>{item.label}</span>
                     </button>
@@ -132,18 +177,33 @@ export const ClientBookingView = ({ onLogout }: ClientBookingViewProps) => {
                 <span><strong>{selectedService.name}</strong><small>{selectedService.detail}</small></span>
               </div>
               <div className="summary-line"><span><Icon name="user" /> Profesional</span><strong>{selectedProfessional.name}</strong></div>
-              <div className="summary-line"><span><Icon name="calendar" /> Fecha</span><strong>{booking[date].label}, {booking[date].number} de julio</strong></div>
+              <div className="summary-line"><span><Icon name="calendar" /> Fecha</span><strong>{business.booking[date].label}, {business.booking[date].number} de julio</strong></div>
               <div className="summary-line"><span><Icon name="clock" /> Horario</span><strong>{time} hs</strong></div>
               <div className="summary-price"><span>Total</span><strong>{selectedService.price}</strong></div>
-              <button className="primary-button" onClick={() => setConfirmed(true)}>
+
+              {/* handleConfirmClick: */}
+              <button className="primary-button" onClick={handleConfirmClick}>
                 {confirmed ? <><Icon name="check" /> ¡Turno confirmado!</> : <>Confirmar turno <Icon name="arrow" /></>}
               </button>
+
               <p className="summary-help"><Icon name="check" size={14} /> Podés cancelar sin cargo hasta 24 hs antes.</p>
             </aside>
           </div>
         </section>
       </main>
-      <footer><Brand /><span>Av. Corrientes 1847 · Buenos Aires</span><span>© 2025 Alma Estética</span></footer>
+      <footer><Brand /><span>{business.address}</span><span>© 2025 {business.name}</span></footer>
+
+      {/* Se renderiza el modal al final del contenedor */}
+      <ClientAuthModal
+        isOpen={isAuthModalOpen}
+        businessId={business.id}
+        businessName={business.name}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={(user) => {
+          setClientUser(user);
+          setIsAuthModalOpen(false);
+        }}
+      />
     </div>
   );
 };
