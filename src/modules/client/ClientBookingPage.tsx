@@ -4,27 +4,31 @@ import { useParams } from "react-router-dom";
 import { Brand } from "../../components/Brand";
 import { Icon } from "../../components/Icon";
 import { MOCK_ALMAESTETICA } from "@/data/mockBusiness";
-import { ClientAuthModal } from "./components/ClientAuthModal";
+import { AuthModalIntent, ClientAuthModal } from "./components/ClientAuthModal";
 import { ClientUser } from "./types/ClientUser";
+import { TenantBrand } from "@/components/TenantBrand";
 
 const slots = ["10:30", "11:30", "14:00", "16:30"];
 
 export const ClientBookingPage = () => {
   const { businessSlug } = useParams<{ businessSlug: string }>();
 
+  // 1. Primero buscamos el negocio antes de inicializar los estados
+  const business = MOCK_ALMAESTETICA.find((b) => b.slug === businessSlug);
+
+  // 2. Inicializamos los estados
   const [clientUser, setClientUser] = useState<ClientUser | null>(null);
-
-  // Estado del modal (boolean):
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalIntent, setAuthModalIntent] = useState<AuthModalIntent>("login");
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
-  const [service, setService] = useState(1);
-  const [professional, setProfessional] = useState(1);
+  const [service, setService] = useState<number>(() => business?.services[0]?.id ?? 1);
+  const [professional, setProfessional] = useState<number>(() => business?.professionals[0]?.id ?? 1);
   const [date, setDate] = useState(0);
   const [time, setTime] = useState("10:30");
   const [confirmed, setConfirmed] = useState(false);
 
-  const business = MOCK_ALMAESTETICA.find((b) => b.slug === businessSlug);
-
+  // 3. El return temprano si no existe sigue yendo DESPUÉS de todos los hooks
   if (!business) {
     return (
       <div className="client-app" style={{ padding: "4rem 2rem", textAlign: "center" }}>
@@ -40,46 +44,69 @@ export const ClientBookingPage = () => {
   // Handler para confirmar turno:
   const handleConfirmClick = () => {
     if (!clientUser) {
+      setAuthModalIntent("booking");
       setIsAuthModalOpen(true);
       return;
     }
     setConfirmed(true);
   };
 
+  const selectAndReset = <T,>(setter: (val: T) => void, value: T) => {
+    setter(value);
+    setConfirmed(false);
+  };
+
   return (
     <div className="client-app">
       <header className="topbar">
-        <Brand />
-        <nav className="main-nav" aria-label="Navegación principal">
-          <button className="nav-link active">Reservar turno</button>
-          {clientUser && (
+        <TenantBrand name={business.name} />
+
+        <div className="topbar-account">
+          {clientUser ? (
+            <div className="user-menu-wrapper">
+              <button
+                type="button"
+                className="user-menu"
+                onClick={() => setIsUserMenuOpen((prev) => !prev)}
+                aria-expanded={isUserMenuOpen}
+              >
+                <span className="user-copy">
+                  <strong>Hola, {clientUser.name}</strong>
+                  <small>Mi cuenta</small>
+                </span>
+                <span className="avatar avatar-small">{clientUser.initials}</span>
+                <Icon name="chevron" size={15} />
+              </button>
+
+              {isUserMenuOpen && (
+                <div className="user-dropdown">
+                  <button
+                    type="button"
+                    className="dropdown-item danger"
+                    onClick={() => {
+                      setClientUser(null);
+                      setConfirmed(false);
+                      setIsUserMenuOpen(false);
+                    }}
+                  >
+                    Cerrar sesión
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
             <button
-              className="nav-link"
+              type="button"
+              className="topbar-login-btn"
               onClick={() => {
-                setClientUser(null);
-                setConfirmed(false);
+                setAuthModalIntent("login");
+                setIsAuthModalOpen(true);
               }}
             >
-              Cerrar sesión
+              Iniciar sesión
             </button>
           )}
-        </nav>
-
-        {clientUser ? (
-          <div className="user-menu">
-            <span className="user-copy">
-              <strong>Hola, {clientUser.name}</strong>
-              <small>Mi cuenta</small>
-            </span>
-            <span className="avatar avatar-small">{clientUser.initials}</span>
-            <Icon name="chevron" size={15} />
-          </div>
-        ) : (
-          /* Se abre el modal en vez de logear directo */
-          <button className="nav-link" onClick={() => setIsAuthModalOpen(true)}>
-            Iniciar sesión
-          </button>
-        )}
+        </div>
       </header>
 
       <main>
@@ -88,10 +115,6 @@ export const ClientBookingPage = () => {
             <span className="eyebrow"><Icon name="sparkle" size={14} /> TU MOMENTO ES AHORA</span>
             <h1>Regalate un momento <em>para vos.</em></h1>
             <p>Elegí tu servicio, profesional y horario. Nosotros nos ocupamos del resto.</p>
-            <div className="hero-trust">
-              <span className="avatar-stack"><i>SM</i><i>VP</i><i>LR</i></span>
-              <span><strong>+850</strong> turnos realizados este mes</span>
-            </div>
           </div>
           <div className="hero-image" role="img" aria-label="Interior cálido y luminoso del centro de estética">
             <div className="hero-card">
@@ -119,7 +142,7 @@ export const ClientBookingPage = () => {
                     <button
                       key={item.id}
                       className={`service-card ${service === item.id ? "selected" : ""}`}
-                      onClick={() => setService(item.id)}
+                      onClick={() => selectAndReset(setService, item.id)}
                     >
                       {service === item.id && <span className="selected-check"><Icon name="check" size={13} /></span>}
                       <span className="service-icon"><Icon name={item.icon} /></span>
@@ -140,7 +163,7 @@ export const ClientBookingPage = () => {
                     <button
                       key={item.id}
                       className={`professional-card ${professional === item.id ? "selected" : ""}`}
-                      onClick={() => setProfessional(item.id)}
+                      onClick={() => selectAndReset(setProfessional, item.id)}
                     >
                       <span className={`avatar avatar-${index + 1}`}>{item.initials}</span>
                       <span><strong>{item.name}</strong><small>{item.role}</small></span>
@@ -157,14 +180,24 @@ export const ClientBookingPage = () => {
                 </div>
                 <div className="date-row">
                   {business.booking.map((item, index) => (
-                    <button key={item.number} onClick={() => setDate(index)} className={`date-card ${date === index ? "selected" : ""}`}>
+                    <button
+                      key={item.number}
+                      onClick={() => selectAndReset(setDate, index)}
+                      className={`date-card ${date === index ? "selected" : ""}`}
+                    >
                       <small>{item.day}</small><strong>{item.number}</strong><span>{item.label}</span>
                     </button>
                   ))}
                 </div>
                 <div className="slots">
                   {slots.map((slot) => (
-                    <button key={slot} onClick={() => setTime(slot)} className={time === slot ? "selected" : ""}>{slot}</button>
+                    <button
+                      key={slot}
+                      onClick={() => selectAndReset(setTime, slot)}
+                      className={time === slot ? "selected" : ""}
+                    >
+                      {slot}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -182,7 +215,7 @@ export const ClientBookingPage = () => {
               <div className="summary-price"><span>Total</span><strong>{selectedService.price}</strong></div>
 
               {/* handleConfirmClick: */}
-              <button className="primary-button" onClick={handleConfirmClick}>
+              <button className="primary-button" onClick={handleConfirmClick} disabled={confirmed}>
                 {confirmed ? <><Icon name="check" /> ¡Turno confirmado!</> : <>Confirmar turno <Icon name="arrow" /></>}
               </button>
 
@@ -191,17 +224,28 @@ export const ClientBookingPage = () => {
           </div>
         </section>
       </main>
-      <footer><Brand /><span>{business.address}</span><span>© 2025 {business.name}</span></footer>
+      <footer>
+        <div className="footer-powered">
+          <small>Reservas con</small>
+          <Brand />
+        </div>
+        <span>{business.address}</span>
+        <span>© 2026 {business.name}</span>
+      </footer>
 
       {/* Se renderiza el modal al final del contenedor */}
       <ClientAuthModal
         isOpen={isAuthModalOpen}
+        intent={authModalIntent}
         businessId={business.id}
         businessName={business.name}
         onClose={() => setIsAuthModalOpen(false)}
         onSuccess={(user) => {
           setClientUser(user);
           setIsAuthModalOpen(false);
+          if (authModalIntent === "booking") {
+            setConfirmed(true);
+          }
         }}
       />
     </div>
