@@ -3,6 +3,9 @@ import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { OwnerAuthPage } from "../modules/owner/auth/OwnerAuthPage";
 import { ClientBookingPage } from "../modules/client/ClientBookingPage";
 import { OwnerDashboardPage } from "../modules/owner/dashboard/OwnerDashboardPage";
+import { SuperadminLoginPage } from "../modules/superadmin/auth/SuperadminLoginPage";
+
+const SUPERADMIN_LOGIN_PATH = "/__platform/9e4c2b71/access";
 
 export const AppRoutes = () => {
   const [isOwnerAuthenticated, setIsOwnerAuthenticated] = useState(false);
@@ -24,6 +27,7 @@ export const AppRoutes = () => {
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<OwnerAuthPage enter={handleOwnerEnter} />} />
       <Route path="/signup" element={<OwnerAuthPage enter={handleOwnerEnter} />} />
+      <Route path={SUPERADMIN_LOGIN_PATH} element={<SuperadminLoginPage />} />
 
       <Route
         path="/owner/*"
