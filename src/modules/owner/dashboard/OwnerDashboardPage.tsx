@@ -1,9 +1,14 @@
 // src/modules/owner/OwnerDashboardPage.tsx
-import { useState, FormEvent } from "react";
+import { useEffect, useState, FormEvent } from "react";
 import { Brand } from "../../../components/Brand";
 import { Icon, IconName } from "../../../components/Icon";
-import { appointments as initialAppointments } from "@/data/mockAppointments";
+
 import { MOCK_ALMAESTETICA } from "@/data/mockBusiness";
+import { authService } from "../../../services/auth.service";
+import { apiRequest } from "../../../services/api";
+import { adminCentroService, type ServicioCentro as ServicioCentroAPI, type ProfesionalCentro as ProfesionalCentroAPI } from "../../../services/admin-centro.service";
+import { ServiciosCentroSection } from "./ServiciosCentroSection";
+import { ProfesionalesCentroSection } from "./ProfesionalesCentroSection";
 
 interface OwnerDashboardViewProps {
   onLogout: () => void;
@@ -16,7 +21,7 @@ type Section =
   | "Profesionales"
   | "Mi centro"
   | "Mi perfil"
-  | "Usuarios";
+  | "Clientes";
 
 interface AppointmentItem {
   id: number;
@@ -34,28 +39,38 @@ const HOURS_SLOTS = [
   "14:00", "15:00", "16:00", "17:00", "18:00", "19:00",
 ];
 
-const getTodayISO = () => {
-  const d = new Date();
-  const offset = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - offset).toISOString().slice(0, 10);
-};
+const ZONA_ARGENTINA = "America/Argentina/Buenos_Aires";
+
+const getTodayISO = () =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: ZONA_ARGENTINA,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 
 const shiftDateISO = (isoDate: string, days: number) => {
-  const [y, m, d] = isoDate.split("-").map(Number);
-  const date = new Date(y, m - 1, d + days);
-  const offset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 };
 
 const formatDisplayDate = (isoDate: string) => {
-  const [y, m, d] = isoDate.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  return date.toLocaleDateString("es-AR", {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone: "UTC",
     weekday: "long",
     day: "numeric",
     month: "long",
-  });
+  }).format(new Date(Date.UTC(year, month - 1, day)));
 };
+
+const formatHoraArgentina = (fechaISO: string) =>
+  new Intl.DateTimeFormat("es-AR", {
+    timeZone: ZONA_ARGENTINA,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(fechaISO));
 
 interface ServiceItem {
   id: number;
@@ -75,13 +90,33 @@ interface ProfessionalItem {
   hours: string;
 }
 
-interface StaffUser {
+interface ClienteCentro {
   id: number;
-  name: string;
+  nombre: string;
   email: string;
-  role: "Administradora" | "Recepción";
-  active: boolean;
+  telefono: string | null;
+  rol: string;
+  activo: boolean;
 }
+
+interface RespuestaClientes {
+  status: string;
+  data: ClienteCentro[];
+}
+
+interface ClienteForm {
+  nombre: string;
+  email: string;
+  telefono: string;
+  password: string;
+}
+
+const clienteInicial: ClienteForm = {
+  nombre: "",
+  email: "",
+  telefono: "",
+  password: "",
+};
 
 const ALL_DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
@@ -95,6 +130,7 @@ const getInitials = (fullName: string) =>
 
 export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
   const initialBiz = MOCK_ALMAESTETICA[0];
+  const tokenAdminCentro = authService.obtenerTokenAdmin();
 
   const [active, setActive] = useState<Section>("Resumen");
   const [centerMenuOpen, setCenterMenuOpen] = useState(false);
@@ -117,12 +153,7 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
   const [selectedDate, setSelectedDate] = useState<string>(todayISO);
   const [proFilter, setProFilter] = useState<string>("all");
 
-  const [appointments, setAppointments] = useState<AppointmentItem[]>(
-    initialAppointments.map((item) => ({
-      ...item,
-      date: todayISO,
-    }))
-  );
+  const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
 
   const [services, setServices] = useState<ServiceItem[]>(initialBiz.services);
   const [professionals, setProfessionals] = useState<ProfessionalItem[]>(
@@ -133,10 +164,121 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
     }))
   );
 
-  const [users, setUsers] = useState<StaffUser[]>([
-    { id: 1, name: "María González", email: "maria@almaestetica.com", role: "Administradora", active: true },
-    { id: 2, name: "Carla Benítez", email: "recepcion@almaestetica.com", role: "Recepción", active: true },
-  ]);
+  const [clientes, setClientes] = useState<ClienteCentro[]>([]);
+  const [clientesCargando, setClientesCargando] = useState(false);
+  const [clientesError, setClientesError] = useState("");
+  const [clientesMensaje, setClientesMensaje] = useState("");
+  const [clienteEditar, setClienteEditar] = useState<ClienteCentro | null>(null);
+  const [clienteForm, setClienteForm] = useState<ClienteForm>({ ...clienteInicial });
+  const [clienteGuardando, setClienteGuardando] = useState(false);
+  const [clienteProcesando, setClienteProcesando] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (active !== "Clientes" || !tokenAdminCentro) return;
+    let vigente = true;
+    setClientesCargando(true);
+    setClientesError("");
+    apiRequest<RespuestaClientes>("/usuarios", {
+      method: "GET",
+      token: tokenAdminCentro,
+    }).then((respuesta) => {
+      if (vigente) setClientes(respuesta.data.filter((usuario) => usuario.rol === "CLIENTE"));
+    }).catch((error) => {
+      if (vigente) setClientesError(error instanceof Error ? error.message : "No se pudieron cargar los clientes.");
+    }).finally(() => {
+      if (vigente) setClientesCargando(false);
+    });
+    return () => { vigente = false; };
+  }, [active, tokenAdminCentro]);
+
+  const recargarClientes = async () => {
+    if (!tokenAdminCentro) return;
+    const respuesta = await apiRequest<RespuestaClientes>("/usuarios", {
+      method: "GET",
+      token: tokenAdminCentro,
+    });
+    setClientes(respuesta.data.filter((usuario) => usuario.rol === "CLIENTE"));
+  };
+
+  const abrirNuevoCliente = () => {
+    setClienteEditar(null);
+    setClienteForm({ ...clienteInicial });
+    setClientesError("");
+    setUserModalOpen(true);
+  };
+
+  const abrirEditarCliente = (cliente: ClienteCentro) => {
+    setClienteEditar(cliente);
+    setClienteForm({
+      nombre: cliente.nombre,
+      email: cliente.email,
+      telefono: cliente.telefono ?? "",
+      password: "",
+    });
+    setClientesError("");
+    setUserModalOpen(true);
+  };
+
+  const guardarCliente = async (evento: FormEvent<HTMLFormElement>) => {
+    evento.preventDefault();
+    if (!tokenAdminCentro || clienteGuardando) return;
+    setClienteGuardando(true);
+    setClientesError("");
+    setClientesMensaje("");
+    try {
+      const datos = {
+        nombre: clienteForm.nombre.trim(),
+        email: clienteForm.email.trim().toLowerCase(),
+        telefono: clienteForm.telefono.trim() || null,
+        ...(clienteForm.password ? { password: clienteForm.password } : {}),
+      };
+      if (clienteEditar) {
+        await apiRequest(`/usuarios/${clienteEditar.id}`, {
+          method: "PUT",
+          token: tokenAdminCentro,
+          body: JSON.stringify(datos),
+        });
+      } else {
+        if (!clienteForm.password || clienteForm.password.length < 6) {
+          throw new Error("La contraseña debe tener al menos 6 caracteres.");
+        }
+        await apiRequest("/usuarios", {
+          method: "POST",
+          token: tokenAdminCentro,
+          body: JSON.stringify(datos),
+        });
+      }
+      await recargarClientes();
+      setClientesMensaje(clienteEditar ? "Cliente actualizado correctamente." : "Cliente creado correctamente.");
+      setUserModalOpen(false);
+    } catch (error) {
+      setClientesError(error instanceof Error ? error.message : "No se pudo guardar el cliente.");
+    } finally {
+      setClienteGuardando(false);
+    }
+  };
+
+  const cambiarEstadoCliente = async (cliente: ClienteCentro) => {
+    if (!tokenAdminCentro || clienteProcesando !== null) return;
+    const accion = cliente.activo ? "desactivar" : "activar";
+    if (!window.confirm(`¿Querés ${accion} a ${cliente.nombre}?`)) return;
+    setClienteProcesando(cliente.id);
+    setClientesError("");
+    setClientesMensaje("");
+    try {
+      await apiRequest(`/usuarios/${cliente.id}`, {
+        method: "PUT",
+        token: tokenAdminCentro,
+        body: JSON.stringify({ activo: !cliente.activo }),
+      });
+      await recargarClientes();
+      setClientesMensaje(`Cliente ${cliente.activo ? "desactivado" : "activado"} correctamente.`);
+    } catch (error) {
+      setClientesError(error instanceof Error ? error.message : "No se pudo cambiar el estado.");
+    } finally {
+      setClienteProcesando(null);
+    }
+  };
 
   // Estados de Modales CRUD
   const [appointmentModal, setAppointmentModal] = useState<AppointmentItem | "new" | null>(null);
@@ -157,35 +299,195 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
     ["Profesionales", "people"],
   ];
 
-  // --- Handlers CRUD ---
-  const handleSaveAppointment = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const client = String(fd.get("client") || "");
-    const payload: Omit<AppointmentItem, "id"> = {
-      date: String(fd.get("date") || selectedDate),
-      time: String(fd.get("time") || "09:00"),
-      client,
-      service: String(fd.get("service") || services[0]?.name || ""),
-      pro: String(fd.get("pro") || professionals[0]?.name || ""),
-      status: String(fd.get("status") || "Confirmado"),
-      initials: getInitials(client),
-    };
+  type TurnoAPI = {
+    id: number;
+    fecha_hora_inicio: string;
+    estado: string;
+    cliente?: { nombre: string };
+    servicio?: { nombre: string };
+    profesional?: { nombre: string; apellido?: string };
+  };
 
-    if (appointmentModal === "new") {
-      setAppointments((prev) => [...prev, { id: Date.now(), ...payload }]);
-    } else if (appointmentModal) {
-      setAppointments((prev) =>
-        prev.map((item) => (item.id === appointmentModal.id ? { ...item, ...payload } : item))
-      );
+  const [turnosError, setTurnosError] = useState("");
+  const [turnosCargando, setTurnosCargando] = useState(false);
+  const [turnoGuardando, setTurnoGuardando] = useState(false);
+  const [turnoClientes, setTurnoClientes] = useState<ClienteCentro[]>([]);
+  const [turnoServicios, setTurnoServicios] = useState<ServicioCentroAPI[]>([]);
+  const [turnoProfesionales, setTurnoProfesionales] = useState<ProfesionalCentroAPI[]>([]);
+  const [busquedaCliente, setBusquedaCliente] = useState("");
+  const [clienteSeleccionado, setClienteSeleccionado] = useState<number | null>(null);
+  const [turnoServicioId, setTurnoServicioId] = useState("");
+  const [turnoProfesionalId, setTurnoProfesionalId] = useState("");
+  const [turnoFecha, setTurnoFecha] = useState(getTodayISO());
+  const [turnoHorario, setTurnoHorario] = useState("");
+  const [horariosDisponibles, setHorariosDisponibles] = useState<{ inicio: string; fin: string }[]>([]);
+  const [horariosCargando, setHorariosCargando] = useState(false);
+  const [horariosError, setHorariosError] = useState("");
+
+  useEffect(() => {
+    if (appointmentModal !== "new" || !tokenAdminCentro || !turnoServicioId || !turnoProfesionalId || !turnoFecha) {
+      setHorariosDisponibles([]);
+      setTurnoHorario("");
+      setHorariosError("");
+      return;
     }
-    setAppointmentModal(null);
+    let vigente = true;
+    setHorariosCargando(true);
+    setHorariosError("");
+    setHorariosDisponibles([]);
+    setTurnoHorario("");
+    const params = new URLSearchParams({
+      servicio_id: turnoServicioId,
+      profesional_id: turnoProfesionalId,
+      fecha: turnoFecha,
+    });
+    apiRequest<{ horarios: { inicio: string; fin: string }[] }>(`/turnos/disponibles?${params.toString()}`, {
+      method: "GET", token: tokenAdminCentro,
+    }).then((resultado) => {
+      if (vigente) setHorariosDisponibles(resultado.horarios ?? []);
+    }).catch((error) => {
+      if (vigente) setHorariosError(error instanceof Error ? error.message : "No se pudieron consultar los horarios.");
+    }).finally(() => {
+      if (vigente) setHorariosCargando(false);
+    });
+    return () => { vigente = false; };
+  }, [appointmentModal, tokenAdminCentro, turnoServicioId, turnoProfesionalId, turnoFecha]);
+
+  const cargarTurnos = async () => {
+    if (!tokenAdminCentro) return;
+    const lista = await apiRequest<TurnoAPI[]>("/turnos", { method: "GET", token: tokenAdminCentro });
+    setAppointments(lista.map((turno) => {
+      const fecha = new Date(turno.fecha_hora_inicio);
+      const partes = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Argentina/Buenos_Aires",
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+      }).formatToParts(fecha);
+      const parte = (tipo: string) => partes.find((p) => p.type === tipo)?.value ?? "";
+      const nombre = turno.cliente?.nombre ?? "Cliente sin datos";
+      return {
+        id: turno.id,
+        date: `${parte("year")}-${parte("month")}-${parte("day")}`,
+        time: `${parte("hour")}:${parte("minute")}`,
+        client: nombre,
+        service: turno.servicio?.nombre ?? "—",
+        pro: [turno.profesional?.nombre, turno.profesional?.apellido].filter(Boolean).join(" ") || "—",
+        status: turno.estado,
+        initials: getInitials(nombre),
+      };
+    }));
   };
 
-  const handleDeleteAppointment = (id: number) => {
-    setAppointments((prev) => prev.filter((a) => a.id !== id));
+  useEffect(() => {
+    if (!tokenAdminCentro) return;
+    let vigente = true;
+    setTurnosCargando(true);
+    apiRequest<TurnoAPI[]>("/turnos", { method: "GET", token: tokenAdminCentro })
+      .then((lista) => {
+        if (!vigente) return;
+        setAppointments(lista.map((turno) => {
+          const fecha = new Date(turno.fecha_hora_inicio);
+          const partes = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "America/Argentina/Buenos_Aires",
+            year: "numeric", month: "2-digit", day: "2-digit",
+            hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+          }).formatToParts(fecha);
+          const parte = (tipo: string) => partes.find((p) => p.type === tipo)?.value ?? "";
+          const nombre = turno.cliente?.nombre ?? "Cliente sin datos";
+          return {
+            id: turno.id,
+            date: `${parte("year")}-${parte("month")}-${parte("day")}`,
+            time: `${parte("hour")}:${parte("minute")}`,
+            client: nombre,
+            service: turno.servicio?.nombre ?? "—",
+            pro: [turno.profesional?.nombre, turno.profesional?.apellido].filter(Boolean).join(" ") || "—",
+            status: turno.estado,
+            initials: getInitials(nombre),
+          };
+        }));
+      })
+      .catch((error) => { if (vigente) setTurnosError(error instanceof Error ? error.message : "Error al cargar turnos."); })
+      .finally(() => { if (vigente) setTurnosCargando(false); });
+    return () => { vigente = false; };
+  }, [tokenAdminCentro]);
+
+  const abrirNuevoTurno = async () => {
+    if (!tokenAdminCentro) return;
+    setTurnosError("");
+    setBusquedaCliente("");
+    setClienteSeleccionado(null);
+    setTurnoServicioId("");
+    setTurnoProfesionalId("");
+    setTurnoFecha(getTodayISO());
+    setTurnoHorario("");
+    try {
+      const [usuarios, serviciosCentro, profesionalesCentro] = await Promise.all([
+        apiRequest<RespuestaClientes>("/usuarios", { method: "GET", token: tokenAdminCentro }),
+        adminCentroService.listarServicios(tokenAdminCentro),
+        adminCentroService.listarProfesionales(tokenAdminCentro),
+      ]);
+      setTurnoClientes(usuarios.data.filter((u) => u.rol === "CLIENTE" && u.activo));
+      setTurnoServicios(serviciosCentro.filter((servicio) => servicio.activo));
+      setTurnoProfesionales(profesionalesCentro.filter((profesional) => profesional.activo));
+      setAppointmentModal("new");
+    } catch (error) {
+      setTurnosError(error instanceof Error ? error.message : "No se pudo preparar el formulario.");
+    }
   };
 
+  const guardarTurnoReal = async (evento: FormEvent<HTMLFormElement>) => {
+    evento.preventDefault();
+    if (!tokenAdminCentro || turnoGuardando) return;
+    if (!clienteSeleccionado) {
+      setTurnosError("Seleccioná un cliente de los resultados de búsqueda.");
+      return;
+    }
+    const fecha = turnoFecha;
+    const hora = turnoHorario;
+    if (!fecha || !hora || !turnoServicioId || !turnoProfesionalId) {
+      setTurnosError("Completá la fecha, el horario, el servicio y el profesional.");
+      return;
+    }
+    if (!horariosDisponibles.some((h) => h.inicio === hora)) {
+      setTurnosError("Seleccioná un horario disponible de la lista.");
+      return;
+    }
+    setTurnoGuardando(true);
+    setTurnosError("");
+    try {
+      await apiRequest("/turnos", {
+        method: "POST",
+        token: tokenAdminCentro,
+        body: JSON.stringify({
+          cliente_id: clienteSeleccionado,
+          servicio_id: Number(turnoServicioId),
+          profesional_id: Number(turnoProfesionalId),
+          fecha_hora_inicio: hora,
+        }),
+      });
+      await cargarTurnos();
+      setAppointmentModal(null);
+      notifySaved("Turno creado correctamente.");
+    } catch (error) {
+      setTurnosError(error instanceof Error ? error.message : "No se pudo crear el turno.");
+    } finally {
+      setTurnoGuardando(false);
+    }
+  };
+
+  const handleDeleteAppointment = async (id: number) => {
+    if (!tokenAdminCentro || !window.confirm("¿Querés cancelar este turno?")) return;
+    setTurnosError("");
+    try {
+      await apiRequest(`/turnos/${id}`, { method: "DELETE", token: tokenAdminCentro });
+      await cargarTurnos();
+      notifySaved("Turno cancelado correctamente.");
+    } catch (error) {
+      setTurnosError(error instanceof Error ? error.message : "No se pudo cancelar el turno.");
+    }
+  };
+
+  // --- Handlers CRUD ---
   const handleSaveService = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
@@ -241,22 +543,6 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
 
   const handleDeleteProfessional = (id: number) => {
     setProfessionals((prev) => prev.filter((p) => p.id !== id));
-  };
-
-  const handleAddUser = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    setUsers((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        name: String(fd.get("name") || ""),
-        email: String(fd.get("email") || ""),
-        role: (fd.get("role") as "Administradora" | "Recepción") || "Recepción",
-        active: true,
-      },
-    ]);
-    setUserModalOpen(false);
   };
 
   const pendingCount = appointments.filter((a) => a.status === "Pendiente").length;
@@ -325,11 +611,11 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
             <span>Mi perfil</span>
           </button>
           <button
-            onClick={() => setActive("Usuarios")}
-            className={active === "Usuarios" ? "active" : ""}
+            onClick={() => setActive("Clientes")}
+            className={active === "Clientes" ? "active" : ""}
           >
             <Icon name="user" />
-            <span>Usuarios</span>
+            <span>Clientes</span>
           </button>
         </nav>
 
@@ -527,7 +813,7 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
                   <h2>Agenda de turnos</h2>
                   <p>Administrá las reservas programadas de hoy y próximos días.</p>
                 </span>
-                <button className="primary-button" onClick={() => setAppointmentModal("new")}>
+                <button className="primary-button" onClick={() => void abrirNuevoTurno()}>
                   <Icon name="plus" /> Nuevo turno
                 </button>
               </section>
@@ -566,13 +852,13 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
                             <div className="table-actions">
                               <button
                                 className="table-btn"
-                                onClick={() => setAppointmentModal(item)}
+                                onClick={() => setTurnosError("La edición de turnos por ADMIN_CENTRO todavía no está disponible en el backend. Podés cancelar y crear otro turno.")}
                               >
                                 Editar
                               </button>
                               <button
                                 className="table-btn danger"
-                                onClick={() => handleDeleteAppointment(item.id)}
+                                onClick={() => void handleDeleteAppointment(item.id)}
                               >
                                 Cancelar
                               </button>
@@ -587,147 +873,26 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
             </>
           )}
 
-          {/* ==================== 3. SERVICIOS ==================== */}
+          {/* ==================== 3. SERVICIOS REALES ==================== */}
           {active === "Servicios" && (
-            <>
-              <section className="welcome">
-                <span>
-                  <h2>Catálogo de servicios</h2>
-                  <p>Prestaciones visibles en la página pública de reservas.</p>
-                </span>
-                <button className="primary-button" onClick={() => setServiceModal("new")}>
-                  <Icon name="plus" /> Nuevo servicio
-                </button>
+            tokenAdminCentro ? (
+              <ServiciosCentroSection token={tokenAdminCentro} />
+            ) : (
+              <section className="panel" role="alert">
+                <p>No se encontró la sesión del administrador. Volvé a iniciar sesión.</p>
               </section>
-
-              <section className="panel">
-                <div className="admin-table-wrap">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Servicio</th>
-                        <th>Descripción</th>
-                        <th>Duración</th>
-                        <th>Precio</th>
-                        <th className="text-right">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {services.map((srv) => (
-                        <tr key={srv.id}>
-                          <td>
-                            <div className="table-entity">
-                              <span className="metric-icon coral">
-                                <Icon name={srv.icon} size={16} />
-                              </span>
-                              <strong>{srv.name}</strong>
-                            </div>
-                          </td>
-                          <td>{srv.detail}</td>
-                          <td>{srv.duration}</td>
-                          <td><strong>{srv.price}</strong></td>
-                          <td className="text-right">
-                            <div className="table-actions">
-                              <button
-                                className="table-btn"
-                                onClick={() => setServiceModal(srv)}
-                              >
-                                Editar
-                              </button>
-                              <button
-                                className="table-btn danger"
-                                onClick={() => handleDeleteService(srv.id)}
-                              >
-                                Eliminar
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            </>
+            )
           )}
 
-          {/* ==================== 4. PROFESIONALES (+ Disponibilidad) ==================== */}
+          {/* ==================== 4. PROFESIONALES REALES ==================== */}
           {active === "Profesionales" && (
-            <>
-              <section className="welcome">
-                <span>
-                  <h2>Equipo y disponibilidad</h2>
-                  <p>Gestioná tus profesionales, especialidades y horarios de atención.</p>
-                </span>
-                <button
-                  className="primary-button"
-                  onClick={() => setProModal({ pro: "new", tab: "datos" })}
-                >
-                  <Icon name="plus" /> Nuevo profesional
-                </button>
+            tokenAdminCentro ? (
+              <ProfesionalesCentroSection token={tokenAdminCentro} />
+            ) : (
+              <section className="panel" role="alert">
+                <p>No se encontró la sesión del administrador. Volvé a iniciar sesión.</p>
               </section>
-
-              <section className="panel">
-                <div className="admin-table-wrap">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Profesional</th>
-                        <th>Especialidad</th>
-                        <th>Días laborales</th>
-                        <th>Franja horaria</th>
-                        <th className="text-right">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {professionals.map((pro, idx) => (
-                        <tr key={pro.id}>
-                          <td>
-                            <div className="table-entity">
-                              <span className={`avatar avatar-list avatar-${(idx % 3) + 1}`}>
-                                {pro.initials}
-                              </span>
-                              <strong>{pro.name}</strong>
-                            </div>
-                          </td>
-                          <td>{pro.role}</td>
-                          <td>
-                            <div className="day-badges">
-                              {pro.days.map((d) => (
-                                <span key={d} className="day-badge">{d}</span>
-                              ))}
-                            </div>
-                          </td>
-                          <td>{pro.hours}</td>
-                          <td className="text-right">
-                            <div className="table-actions">
-                              <button
-                                className="table-btn"
-                                onClick={() => setProModal({ pro, tab: "disponibilidad" })}
-                              >
-                                Disponibilidad
-                              </button>
-                              <button
-                                className="table-btn"
-                                onClick={() => setProModal({ pro, tab: "datos" })}
-                              >
-                                Editar
-                              </button>
-                              <button
-                                className="table-btn danger"
-                                onClick={() => handleDeleteProfessional(pro.id)}
-                              >
-                                Eliminar
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            </>
+            )
           )}
 
           {/* ==================== 5. MI CENTRO (desde flecha superior) ==================== */}
@@ -844,62 +1009,37 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
             </>
           )}
 
-          {/* ==================== 7. USUARIOS ==================== */}
-          {active === "Usuarios" && (
+          {/* ==================== 7. CLIENTES ==================== */}
+          {active === "Clientes" && (
             <>
               <section className="welcome">
-                <span>
-                  <h2>Usuarios del sistema</h2>
-                  <p>Personas con acceso al panel administrativo de {centerInfo.name}.</p>
-                </span>
-                <button className="primary-button" onClick={() => setUserModalOpen(true)}>
-                  <Icon name="plus" /> Nuevo usuario
-                </button>
+                <span><h2>Clientes del centro</h2><p>Gestioná los clientes registrados en tu centro.</p></span>
+                <button type="button" className="primary-button" onClick={abrirNuevoCliente}><Icon name="plus" /> Nuevo cliente</button>
               </section>
-
+              {clientesMensaje && <div className="admin-toast" role="status">{clientesMensaje}</div>}
+              {clientesError && <p role="alert" style={{ color: "#bd4b3b" }}>{clientesError}</p>}
               <section className="panel">
-                <div className="admin-table-wrap">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Usuario</th>
-                        <th>Email</th>
-                        <th>Rol</th>
-                        <th>Estado</th>
-                        <th className="text-right">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {users.map((u) => (
-                        <tr key={u.id}>
-                          <td>
-                            <div className="table-entity">
-                              <span className="avatar avatar-list">{getInitials(u.name)}</span>
-                              <strong>{u.name}</strong>
-                            </div>
-                          </td>
-                          <td>{u.email}</td>
-                          <td>{u.role}</td>
-                          <td>
-                            <span className={`status ${u.active ? "" : "pending"}`}>
-                              {u.active ? "Activo" : "Inactivo"}
-                            </span>
-                          </td>
-                          <td className="text-right">
-                            {u.id !== 1 && (
-                              <button
-                                className="table-btn danger"
-                                onClick={() => setUsers((prev) => prev.filter((x) => x.id !== u.id))}
-                              >
-                                Quitar acceso
-                              </button>
-                            )}
-                          </td>
+                {!tokenAdminCentro ? <p>Volvé a iniciar sesión.</p> : clientesCargando ? <p>Cargando clientes...</p> : (
+                  <div className="admin-table-wrap">
+                    <table className="admin-table">
+                      <thead><tr><th>Cliente</th><th>Email</th><th>Teléfono</th><th>Estado</th><th className="text-right">Acciones</th></tr></thead>
+                      <tbody>{clientes.map((cliente) => (
+                        <tr key={cliente.id}>
+                          <td><div className="table-entity"><span className="avatar avatar-list">{getInitials(cliente.nombre)}</span><strong>{cliente.nombre}</strong></div></td>
+                          <td>{cliente.email}</td><td>{cliente.telefono || "—"}</td>
+                          <td><span className={`status ${cliente.activo ? "" : "pending"}`}>{cliente.activo ? "Activo" : "Inactivo"}</span></td>
+                          <td className="text-right"><div className="table-actions">
+                            <button type="button" className="table-btn" onClick={() => abrirEditarCliente(cliente)}>Editar</button>
+                            <button type="button" className={cliente.activo ? "table-btn danger" : "table-btn"} disabled={clienteProcesando !== null} onClick={() => cambiarEstadoCliente(cliente)}>
+                              {clienteProcesando === cliente.id ? "Procesando..." : cliente.activo ? "Desactivar" : "Activar"}
+                            </button>
+                          </div></td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      ))}</tbody>
+                    </table>
+                    {clientes.length === 0 && <p>No hay clientes registrados en este centro.</p>}
+                  </div>
+                )}
               </section>
             </>
           )}
@@ -907,69 +1047,103 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
       </main>
 
       {/* ==================== MODALES DE CREACIÓN / EDICIÓN ==================== */}
-      {appointmentModal && (
-        <div className="admin-modal-backdrop" onClick={() => setAppointmentModal(null)}>
+      {appointmentModal === "new" && (
+        <div className="admin-modal-backdrop" onClick={() => !turnoGuardando && setAppointmentModal(null)}>
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>{appointmentModal === "new" ? "Nuevo turno" : "Editar turno"}</h3>
-            <form onSubmit={handleSaveAppointment} className="admin-form">
+            <h3>Nuevo turno</h3>
+            {turnosError && <p role="alert" style={{ color: "#bd4b3b" }}>{turnosError}</p>}
+            <form onSubmit={guardarTurnoReal} className="admin-form">
               <label>
-                <span>Cliente</span>
+                <span>Buscar cliente por nombre</span>
                 <input
-                  name="client"
-                  defaultValue={appointmentModal === "new" ? "" : appointmentModal.client}
-                  placeholder="Nombre y apellido"
+                  type="search"
+                  value={busquedaCliente}
+                  onChange={(e) => {
+                    setBusquedaCliente(e.target.value);
+                    setClienteSeleccionado(null);
+                  }}
+                  placeholder="Escribí el nombre del cliente..."
+                  autoComplete="off"
                   required
                 />
               </label>
+              {busquedaCliente.trim() && clienteSeleccionado === null && (
+                <div style={{ maxHeight: 160, overflowY: "auto", border: "1px solid #e9dfd8", borderRadius: 10, marginTop: -8, marginBottom: 12 }}>
+                  {turnoClientes.filter((cliente) =>
+                    cliente.nombre.toLocaleLowerCase("es-AR").includes(busquedaCliente.trim().toLocaleLowerCase("es-AR"))
+                  ).slice(0, 12).map((cliente) => (
+                    <button
+                      key={cliente.id}
+                      type="button"
+                      onClick={() => {
+                        setClienteSeleccionado(cliente.id);
+                        setBusquedaCliente(cliente.nombre);
+                      }}
+                      style={{ display: "block", width: "100%", padding: 10, border: 0, borderBottom: "1px solid #eee", background: "#fff", textAlign: "left", cursor: "pointer" }}
+                    >
+                      <strong>{cliente.nombre}</strong>
+                      <small style={{ display: "block", color: "#777" }}>{cliente.email}</small>
+                    </button>
+                  ))}
+                  {!turnoClientes.some((cliente) => cliente.nombre.toLocaleLowerCase("es-AR").includes(busquedaCliente.trim().toLocaleLowerCase("es-AR"))) && (
+                    <p style={{ padding: 10 }}>No hay coincidencias. Registrá primero al cliente en Clientes.</p>
+                  )}
+                </div>
+              )}
+              {clienteSeleccionado !== null && <p style={{ color: "#41805c", fontSize: 13 }}>✓ Cliente seleccionado</p>}
               <div className="form-grid-2">
                 <label>
-                  <span>Horario</span>
-                  <input
-                    name="time"
-                    type="time"
-                    defaultValue={appointmentModal === "new" ? "10:00" : appointmentModal.time}
-                    required
-                  />
+                  <span>Fecha</span>
+                  <input type="date" name="date" value={turnoFecha} onChange={(e) => setTurnoFecha(e.target.value)} min={getTodayISO()} required />
                 </label>
                 <label>
-                  <span>Estado</span>
-                  <select
-                    name="status"
-                    defaultValue={appointmentModal === "new" ? "Confirmado" : appointmentModal.status}
-                  >
-                    <option value="Confirmado">Confirmado</option>
-                    <option value="Pendiente">Pendiente</option>
+                  <span>Horario</span>
+                  <select name="time" value={turnoHorario} onChange={(e) => setTurnoHorario(e.target.value)} disabled={!turnoServicioId || !turnoProfesionalId || horariosCargando || horariosDisponibles.length === 0} required>
+                    <option value="">{horariosCargando ? "Consultando horarios..." : !turnoServicioId || !turnoProfesionalId ? "Elegí servicio y profesional" : horariosDisponibles.length === 0 ? "No hay horarios disponibles" : "Seleccioná un horario"}</option>
+                    {horariosDisponibles.map((horario) => (
+                      <option key={horario.inicio} value={horario.inicio}>
+                        {formatHoraArgentina(horario.inicio)}
+                      </option>
+                    ))}
                   </select>
                 </label>
               </div>
+              {horariosError && <p role="alert" style={{ color: "#bd4b3b" }}>{horariosError}</p>}
               <label>
                 <span>Servicio</span>
                 <select
-                  name="service"
-                  defaultValue={appointmentModal === "new" ? services[0]?.name : appointmentModal.service}
+                  value={turnoServicioId}
+                  onChange={(e) => {
+                    setTurnoServicioId(e.target.value);
+                    setTurnoProfesionalId("");
+                  }}
+                  required
                 >
-                  {services.map((s) => (
-                    <option key={s.id} value={s.name}>{s.name}</option>
+                  <option value="">Seleccioná un servicio</option>
+                  {turnoServicios.map((servicio) => (
+                    <option key={servicio.id} value={servicio.id}>{servicio.nombre}</option>
                   ))}
                 </select>
               </label>
               <label>
                 <span>Profesional</span>
-                <select
-                  name="pro"
-                  defaultValue={appointmentModal === "new" ? professionals[0]?.name : appointmentModal.pro}
-                >
-                  {professionals.map((p) => (
-                    <option key={p.id} value={p.name}>{p.name}</option>
-                  ))}
+                <select value={turnoProfesionalId} onChange={(e) => setTurnoProfesionalId(e.target.value)} required>
+                  <option value="">Seleccioná un profesional</option>
+                  {turnoProfesionales
+                    .filter((profesional) => !turnoServicioId || profesional.servicios?.some((servicio) => servicio.id === Number(turnoServicioId)))
+                    .map((profesional) => (
+                      <option key={profesional.id} value={profesional.id}>
+                        {profesional.nombre} {profesional.apellido}
+                      </option>
+                    ))}
                 </select>
               </label>
               <div className="modal-actions">
-                <button type="button" className="table-btn" onClick={() => setAppointmentModal(null)}>
+                <button type="button" className="table-btn" disabled={turnoGuardando} onClick={() => setAppointmentModal(null)}>
                   Cancelar
                 </button>
-                <button type="submit" className="primary-button">
-                  Guardar turno
+                <button type="submit" className="primary-button" disabled={turnoGuardando}>
+                  {turnoGuardando ? "Guardando..." : "Crear turno"}
                 </button>
               </div>
             </form>
@@ -1116,32 +1290,18 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
       )}
 
       {userModalOpen && (
-        <div className="admin-modal-backdrop" onClick={() => setUserModalOpen(false)}>
+        <div className="admin-modal-backdrop" onClick={() => !clienteGuardando && setUserModalOpen(false)}>
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Nuevo usuario</h3>
-            <form onSubmit={handleAddUser} className="admin-form">
-              <label>
-                <span>Nombre completo</span>
-                <input name="name" placeholder="Ej. Carla Benítez" required />
-              </label>
-              <label>
-                <span>Correo electrónico</span>
-                <input name="email" type="email" placeholder="usuario@almaestetica.com" required />
-              </label>
-              <label>
-                <span>Rol</span>
-                <select name="role" defaultValue="Recepción">
-                  <option value="Recepción">Recepción</option>
-                  <option value="Administradora">Administradora</option>
-                </select>
-              </label>
+            <h3>{clienteEditar ? "Editar cliente" : "Nuevo cliente"}</h3>
+            {clientesError && <p role="alert" style={{ color: "#bd4b3b" }}>{clientesError}</p>}
+            <form onSubmit={guardarCliente} className="admin-form">
+              <label><span>Nombre completo</span><input value={clienteForm.nombre} onChange={(e) => setClienteForm((prev) => ({ ...prev, nombre: e.target.value }))} minLength={3} required /></label>
+              <label><span>Correo electrónico</span><input type="email" value={clienteForm.email} onChange={(e) => setClienteForm((prev) => ({ ...prev, email: e.target.value }))} required /></label>
+              <label><span>Teléfono (opcional)</span><input type="tel" value={clienteForm.telefono} onChange={(e) => setClienteForm((prev) => ({ ...prev, telefono: e.target.value }))} /></label>
+              <label><span>{clienteEditar ? "Nueva contraseña (opcional)" : "Contraseña"}</span><input type="password" value={clienteForm.password} onChange={(e) => setClienteForm((prev) => ({ ...prev, password: e.target.value }))} minLength={6} required={!clienteEditar} /></label>
               <div className="modal-actions">
-                <button type="button" className="table-btn" onClick={() => setUserModalOpen(false)}>
-                  Cancelar
-                </button>
-                <button type="submit" className="primary-button">
-                  Crear usuario
-                </button>
+                <button type="button" className="table-btn" disabled={clienteGuardando} onClick={() => setUserModalOpen(false)}>Cancelar</button>
+                <button type="submit" className="primary-button" disabled={clienteGuardando}>{clienteGuardando ? "Guardando..." : clienteEditar ? "Guardar cambios" : "Crear cliente"}</button>
               </div>
             </form>
           </div>

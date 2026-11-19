@@ -1,0 +1,698 @@
+.superadmin-dashboard {
+    display: grid;
+    grid-template-columns: 250px minmax(0, 1fr);
+    min-height: 100vh;
+    background: var(--paper);
+    color: var(--ink);
+}
+
+.superadmin-dashboard-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 100vh;
+    padding: 30px 20px;
+    background: var(--white);
+    border-right: 1px solid var(--line);
+}
+
+.superadmin-dashboard-brand {
+    margin: 0 8px 30px;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.superadmin-dashboard-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.superadmin-dashboard-button {
+    width: 100%;
+    padding: 13px 16px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink);
+    text-align: left;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.superadmin-dashboard-button:hover {
+    background: var(--coral-soft);
+    color: var(--coral-dark);
+}
+
+.superadmin-dashboard-button.active {
+    background: var(--coral);
+    color: var(--white);
+}
+
+.superadmin-dashboard-logout {
+    margin-top: auto;
+    border: 1px solid var(--line);
+    color: var(--coral-dark);
+}
+
+.superadmin-dashboard-content {
+    min-width: 0;
+    padding: 45px;
+}
+
+.superadmin-dashboard-content h1 {
+    margin-bottom: 16px;
+    font-size: clamp(26px, 3vw, 34px);
+}
+
+.superadmin-dashboard-content p {
+    max-width: 650px;
+    margin-bottom: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+}
+
+@media (max-width: 700px) {
+    .superadmin-dashboard {
+        grid-template-columns: 1fr;
+    }
+
+    .superadmin-dashboard-sidebar {
+        min-height: auto;
+        padding: 20px;
+    }
+
+    .superadmin-dashboard-brand {
+        margin-bottom: 10px;
+    }
+
+    .superadmin-dashboard-logout {
+        margin-top: 12px;
+    }
+
+    .superadmin-dashboard-content {
+        padding: 28px 20px;
+    }
+}
+
+
+/* Encabezado móvil: oculto en escritorio */
+.superadmin-dashboard-mobile-header {
+    display: none;
+}
+
+.superadmin-dashboard-overlay {
+    display: none;
+}
+
+/* Menú hamburguesa en pantallas pequeñas */
+@media (max-width: 700px) {
+    .superadmin-dashboard {
+        display: block;
+        min-height: 100vh;
+    }
+
+    .superadmin-dashboard-mobile-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 68px;
+        padding: 0 20px;
+        background: var(--white);
+        border-bottom: 1px solid var(--line);
+    }
+
+    .superadmin-dashboard-mobile-brand {
+        font-size: 23px;
+        font-weight: 700;
+        color: var(--ink);
+    }
+
+    .superadmin-dashboard-menu-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        padding: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--white);
+        color: var(--ink);
+        font-size: 24px;
+        cursor: pointer;
+    }
+
+    .superadmin-dashboard-sidebar {
+        position: fixed;
+        top: 68px;
+        left: 0;
+        z-index: 1001;
+        width: min(290px, 85vw);
+        height: calc(100dvh - 68px);
+        min-height: 0;
+        padding: 24px 20px;
+        overflow-y: auto;
+        background: var(--white);
+        box-shadow: 4px 0 18px rgba(0, 0, 0, 0.08);
+
+        transform: translateX(-110%);
+        visibility: hidden;
+        transition: transform 0.25s ease, visibility 0.25s;
+    }
+
+    .superadmin-dashboard-sidebar.is-open {
+        transform: translateX(0);
+        visibility: visible;
+    }
+
+    .superadmin-dashboard-overlay {
+        display: block;
+        position: fixed;
+        inset: 68px 0 0;
+        z-index: 1000;
+        width: 100%;
+        height: calc(100dvh - 68px);
+        padding: 0;
+        border: none;
+        border-radius: 0;
+        background: rgba(0, 0, 0, 0.4);
+        cursor: pointer;
+    }
+
+    .superadmin-dashboard-content {
+        padding: 28px 20px;
+    }
+}
+
+
+/* ========================================
+   SUPERADMIN - ESTADÍSTICAS
+======================================== */
+
+.superadmin-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 32px;
+  margin-bottom: 40px;
+}
+
+.superadmin-stat-card {
+  min-width: 0;
+  padding: 26px;
+  background: var(--white, #ffffff);
+  border: 1px solid var(--line, #e8e1da);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(48, 43, 42, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.superadmin-stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(48, 43, 42, 0.08);
+}
+
+.superadmin-stat-card h2 {
+  margin: 0 0 18px;
+  color: var(--muted, #817874);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.superadmin-stat-card strong {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--ink, #302b2a);
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.superadmin-stat-card p {
+  margin: 0;
+  color: var(--muted, #817874);
+  font-size: 13px;
+}
+
+/* ========================================
+   SUPERADMIN - CENTROS RECIENTES
+======================================== */
+
+.superadmin-recent {
+  padding: 26px;
+  background: var(--white, #ffffff);
+  border: 1px solid var(--line, #e8e1da);
+  border-radius: 16px;
+}
+
+.superadmin-recent > h2 {
+  margin: 0 0 24px;
+  color: var(--ink, #302b2a);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.superadmin-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.superadmin-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.superadmin-table th {
+  padding: 14px 16px;
+  background: var(--paper, #fbf9f6);
+  color: var(--muted, #817874);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.superadmin-table td {
+  padding: 16px;
+  border-bottom: 1px solid var(--line, #e8e1da);
+  color: var(--ink, #302b2a);
+  font-size: 14px;
+}
+
+.superadmin-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.superadmin-table tbody tr:hover {
+  background: var(--paper, #fbf9f6);
+}
+
+/* ========================================
+   SUPERADMIN - RESPONSIVE
+======================================== */
+
+@media (max-width: 1100px) {
+  .superadmin-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .superadmin-stats {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-top: 24px;
+    margin-bottom: 28px;
+  }
+
+  .superadmin-stat-card {
+    padding: 22px;
+  }
+
+  .superadmin-stat-card strong {
+    font-size: 36px;
+  }
+
+  .superadmin-recent {
+    padding: 18px;
+  }
+
+  .superadmin-recent > h2 {
+    font-size: 18px;
+  }
+
+  .superadmin-table {
+    min-width: 480px;
+  }
+}
+
+
+/* =========================================
+   IDENTIDAD VISUAL AGENDIA - SUPERADMIN
+========================================= */
+
+/* Fondo cálido y encabezado */
+.superadmin-dashboard {
+  background: var(--paper);
+}
+
+.superadmin-dashboard-content > h1 {
+  color: var(--ink);
+  letter-spacing: -0.7px;
+}
+
+.superadmin-dashboard-content > h1::after {
+  content: "";
+  display: block;
+  width: 54px;
+  height: 4px;
+  margin-top: 14px;
+  border-radius: 10px;
+  background: var(--coral);
+}
+
+/* Identidad del menú lateral */
+.superadmin-dashboard-brand,
+.superadmin-dashboard-mobile-brand {
+  color: var(--coral-dark);
+}
+
+.superadmin-dashboard-button.active {
+  background: var(--coral-soft);
+  color: var(--coral-dark);
+  border-color: var(--coral-soft);
+}
+
+.superadmin-dashboard-button:hover {
+  background: var(--coral-soft);
+  color: var(--coral-dark);
+}
+
+.superadmin-dashboard-logout {
+  color: var(--coral-dark);
+  border-color: var(--line);
+}
+
+.superadmin-dashboard-logout:hover {
+  background: var(--coral-soft);
+  border-color: var(--coral);
+}
+
+/* Tarjetas de estadísticas */
+.superadmin-stat-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.superadmin-stat-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: var(--coral);
+}
+
+/* Centros registrados: coral */
+.superadmin-stat-card:nth-child(1) {
+  background: linear-gradient(
+    145deg,
+    var(--white),
+    var(--coral-soft)
+  );
+}
+
+.superadmin-stat-card:nth-child(1) strong {
+  color: var(--coral-dark);
+}
+
+/* Centros activos: verde */
+.superadmin-stat-card:nth-child(2) {
+  background: linear-gradient(
+    145deg,
+    var(--white),
+    var(--green-soft)
+  );
+}
+
+.superadmin-stat-card:nth-child(2)::before {
+  background: var(--green);
+}
+
+.superadmin-stat-card:nth-child(2) strong {
+  color: var(--green);
+}
+
+/* Centros inactivos: ocre */
+.superadmin-stat-card:nth-child(3) {
+  background: linear-gradient(
+    145deg,
+    var(--white),
+    var(--ochre-soft)
+  );
+}
+
+.superadmin-stat-card:nth-child(3)::before {
+  background: var(--ochre);
+}
+
+.superadmin-stat-card:nth-child(3) strong {
+  color: var(--ochre);
+}
+
+/* Tabla de centros recientes */
+.superadmin-recent {
+  border-color: var(--line);
+  box-shadow: 0 8px 28px rgba(72, 57, 50, 0.05);
+}
+
+.superadmin-recent > h2 {
+  color: var(--coral-dark);
+}
+
+.superadmin-table th {
+  background: var(--cream);
+  color: var(--ink);
+}
+
+.superadmin-table tbody tr:hover {
+  background: var(--coral-soft);
+}
+
+.superadmin-table td:first-child {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.superadmin-create-button {
+  margin: 18px 0 26px;
+  padding: 12px 22px;
+  background: var(--coral);
+  color: var(--white);
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.superadmin-create-button:hover {
+  background: var(--coral-dark);
+}
+
+.superadmin-create-button:focus-visible {
+  outline: 3px solid var(--coral-dark);
+  outline-offset: 3px;
+}
+
+
+/* =========================================
+   AGENDIA - FORMULARIO DE CENTROS
+========================================= */
+
+/* Contenedor del formulario */
+.superadmin-dashboard-content form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+  margin-top: 24px;
+}
+
+/* Cada campo */
+.superadmin-dashboard-content form > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Etiquetas */
+.superadmin-dashboard-content form label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* Inputs y select */
+.superadmin-dashboard-content form input,
+.superadmin-dashboard-content form select {
+  width: 100%;
+  min-width: 0;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+  box-sizing: border-box;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.superadmin-dashboard-content form input::placeholder {
+  color: var(--muted);
+}
+
+/* Foco de los campos */
+.superadmin-dashboard-content form input:focus,
+.superadmin-dashboard-content form select:focus {
+  outline: none;
+  border-color: var(--coral);
+  box-shadow: 0 0 0 3px rgba(200, 110, 90, 0.13);
+}
+
+/* Campos inválidos después de interactuar */
+.superadmin-dashboard-content form input:not(:placeholder-shown):invalid {
+  border-color: var(--coral-dark);
+}
+
+/* Mensajes de error */
+.superadmin-dashboard-content form p[role="alert"] {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--coral);
+  border-radius: 10px;
+  background: var(--coral-soft);
+  color: var(--coral-dark);
+  font-size: 14px;
+}
+
+/* Botones del formulario */
+.superadmin-dashboard-content form > div:last-child {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.superadmin-dashboard-content form button {
+  padding: 12px 22px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+/* Guardar */
+.superadmin-dashboard-content form button[type="submit"] {
+  background: var(--coral);
+  color: var(--white);
+}
+
+.superadmin-dashboard-content form button[type="submit"]:hover {
+  background: var(--coral-dark);
+}
+
+/* Cancelar */
+.superadmin-dashboard-content form button[type="button"] {
+  background: var(--white);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.superadmin-dashboard-content form button[type="button"]:hover {
+  background: var(--coral-soft);
+  color: var(--coral-dark);
+}
+
+/* Botones deshabilitados */
+.superadmin-dashboard-content form button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* =========================================
+   AGENDIA - TABLA Y ACCIONES
+========================================= */
+
+/* Mejor distribución de la tabla */
+.superadmin-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.superadmin-table th,
+.superadmin-table td {
+  padding: 15px 18px;
+  vertical-align: middle;
+}
+
+.superadmin-table tbody tr {
+  transition: background 0.2s ease;
+}
+
+.superadmin-table tbody tr:hover {
+  background: var(--coral-soft);
+}
+
+/* Botones de acciones dentro de la tabla */
+.superadmin-table .superadmin-create-button {
+  margin: 4px;
+  padding: 9px 14px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* Primer botón: editar */
+.superadmin-table td:last-child
+.superadmin-create-button:first-child {
+  background: var(--white);
+  color: var(--coral-dark);
+  border: 1px solid var(--coral);
+}
+
+.superadmin-table td:last-child
+.superadmin-create-button:first-child:hover {
+  background: var(--coral-soft);
+}
+
+/* Segundo botón: activar/desactivar */
+.superadmin-table td:last-child
+.superadmin-create-button:last-child {
+  background: var(--coral);
+  color: var(--white);
+}
+
+/* =========================================
+   RESPONSIVE
+========================================= */
+
+@media (max-width: 700px) {
+  .superadmin-dashboard-content form {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .superadmin-dashboard-content form > div:last-child {
+    flex-direction: column-reverse;
+  }
+
+  .superadmin-dashboard-content form button {
+    width: 100%;
+  }
+
+  .superadmin-table th,
+  .superadmin-table td {
+    padding: 12px;
+    font-size: 13px;
+  }
+}
