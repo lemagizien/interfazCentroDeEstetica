@@ -37,12 +37,15 @@ Vite muestra en la terminal la dirección local para abrir la aplicación.
 
 ## Ejecución con Docker Compose
 
-Desde la raíz del repositorio, definí `EMAIL_USER`, `EMAIL_APP_PASSWORD` y
-`OLLAMA_MODEL` en un archivo `.env`, y luego ejecutá:
+Desde la raíz del repositorio, ejecutá:
 
 ```sh
 docker compose up --build
 ```
+
+El correo es opcional: para habilitar el envío, definí `EMAIL_USER` y
+`EMAIL_APP_PASSWORD` en un archivo `.env` en la raíz. Ollama usa `qwen2.5` por
+defecto; podés cambiarlo definiendo `OLLAMA_MODEL` en ese mismo archivo.
 
 La aplicación queda disponible en `http://localhost:5173` y consume la API del
 backend en `http://localhost:4000/api`.
