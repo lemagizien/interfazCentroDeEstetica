@@ -35,6 +35,18 @@ pnpm dev
 
 Vite muestra en la terminal la dirección local para abrir la aplicación.
 
+## Ejecución con Docker Compose
+
+Desde la raíz del repositorio, definí `EMAIL_USER`, `EMAIL_APP_PASSWORD` y
+`OLLAMA_MODEL` en un archivo `.env`, y luego ejecutá:
+
+```sh
+docker compose up --build
+```
+
+La aplicación queda disponible en `http://localhost:5173` y consume la API del
+backend en `http://localhost:4000/api`.
+
 ## Comandos disponibles
 
 | Comando | Descripción |
