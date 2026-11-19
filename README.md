@@ -44,8 +44,9 @@ docker compose up --build
 ```
 
 El correo es opcional: para habilitar el envío, definí `EMAIL_USER` y
-`EMAIL_APP_PASSWORD` en un archivo `.env` en la raíz. Ollama usa `qwen2.5` por
-defecto; podés cambiarlo definiendo `OLLAMA_MODEL` en ese mismo archivo.
+`EMAIL_APP_PASSWORD` en `Backend/.env`. Compose carga ese archivo si existe.
+Ollama usa `qwen2.5` por defecto; podés cambiarlo definiendo `OLLAMA_MODEL`
+también en `Backend/.env`.
 
 La aplicación queda disponible en `http://localhost:5173` y consume la API del
 backend en `http://localhost:4000/api`.
