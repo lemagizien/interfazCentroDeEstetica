@@ -158,6 +158,14 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
     return () => media.removeEventListener("change", cerrarEnEscritorio);
   }, []);
 
+  // Bloquea el scroll del fondo mientras el menú móvil está abierto.
+  useEffect(() => {
+    if (!mobileMenuOpen || window.matchMedia("(min-width: 841px)").matches) return;
+    const anterior = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = anterior; };
+  }, [mobileMenuOpen]);
+
   // Datos reales del centro y del administrador autenticado.
   const [centerInfo, setCenterInfo] = useState({ name: "", tagline: "", address: "", phone: "" });
   const [profileInfo, setProfileInfo] = useState({ name: "", email: "", role: "Administrador" });
