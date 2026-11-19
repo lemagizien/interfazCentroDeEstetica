@@ -218,7 +218,7 @@ button { cursor: pointer; }
 .summary-help svg { color: var(--green); }
 footer { height: 85px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 0 max(5vw, 30px); color: var(--muted); font-size: 10px; background: var(--white); }
 
-/* Panel administrativo */
+/* PANEL ADMINISTRATIVO (OWNER) */
 .admin-app { min-height: 100vh; display: grid; grid-template-columns: 225px minmax(0,1fr); background: #f6f4f1; }
 .sidebar { background: var(--white); border-right: 1px solid var(--line); padding: 25px 17px 20px; display: flex; flex-direction: column; min-height: 100vh; position: sticky; top: 0; height: 100vh; }
 .sidebar > .brand { margin: 0 12px 25px; }
@@ -242,6 +242,65 @@ footer { height: 85px; border-top: 1px solid var(--line); display: flex; align-i
 .admin-profile > span:first-child { display: flex; flex-direction: column; text-align: right; }
 .mobile-menu { display: none; }
 .admin-content { padding: 31px 35px 45px; max-width: 1400px; margin: auto; }
+
+/* Desplegable de tarjeta de centro */
+.center-switch-wrapper { position: relative; }
+.center-switch { width: 100%; background: var(--white); text-align: left; cursor: pointer; }
+.center-switch:hover { border-color: var(--coral); }
+.center-dropdown { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--white); border: 1px solid var(--line); border-radius: 7px; padding: 4px; box-shadow: 0 10px 24px rgba(0,0,0,.08); z-index: 20; }
+.center-dropdown button { width: 100%; border: 0; background: transparent; padding: 8px 10px; border-radius: 5px; display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--ink); cursor: pointer; }
+.center-dropdown button:hover { background: var(--coral-soft); color: var(--coral-dark); }
+
+/* Tablas administrativas */
+.admin-table-wrap { width: 100%; overflow-x: auto; }
+.admin-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.admin-table th { text-align: left; padding: 14px 18px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .8px; font-weight: 700; }
+.admin-table td { padding: 14px 18px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.admin-table tr:last-child td { border-bottom: 0; }
+.admin-table .text-right { text-align: right; }
+.table-entity { display: flex; align-items: center; gap: 10px; }
+.table-actions { display: inline-flex; gap: 6px; justify-content: flex-end; }
+.table-btn { border: 1px solid var(--line); background: var(--white); color: var(--ink); border-radius: 6px; padding: 6px 11px; font-size: 11px; font-weight: 600; cursor: pointer; }
+.table-btn:hover { border-color: var(--coral); color: var(--coral-dark); }
+.table-btn.danger:hover { border-color: #b91c1c; color: #b91c1c; background: #fef2f2; }
+
+/* Badges de días laborales */
+.day-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+.day-badge { padding: 3px 7px; border-radius: 5px; background: var(--coral-soft); color: var(--coral-dark); font-size: 10px; font-weight: 700; }
+
+/* Formularios y modales del panel */
+.admin-form-panel { padding: 24px; }
+.admin-form { display: flex; flex-direction: column; gap: 14px; }
+.admin-form label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ink); }
+.admin-form input, .admin-form select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  font: 13px "DM Sans", sans-serif;
+  outline: 0;
+}
+
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.admin-form input:focus, .admin-form select:focus { border-color: var(--coral); background: var(--white); }
+.form-footer { display: flex; justify-content: flex-end; margin-top: 6px; }
+.admin-toast { margin-bottom: 16px; padding: 10px 16px; border-radius: 7px; background: var(--green-soft); color: var(--green); font-size: 12px; font-weight: 700; }
+
+.admin-modal-backdrop { position: fixed; inset: 0; background: rgba(25, 20, 18, .45); display: grid; place-items: center; padding: 20px; z-index: 100; }
+.admin-modal { width: min(100%, 460px); background: var(--white); border: 1px solid var(--line); border-radius: 10px; padding: 24px; box-shadow: 0 20px 45px rgba(0,0,0,.15); }
+.admin-modal h3 { font: 600 18px "DM Sans", sans-serif; margin-bottom: 16px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+
+.days-selector { display: flex; flex-wrap: wrap; gap: 8px; }
+.day-check { display: inline-flex !important; flex-direction: row !important; align-items: center; gap: 5px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; font-size: 11px !important; }
 
 /* Métricas, agenda, equipo y acciones rápidas */
 .welcome { display: flex; align-items: end; justify-content: space-between; margin-bottom: 25px; }
@@ -293,6 +352,37 @@ footer { height: 85px; border-top: 1px solid var(--line); display: flex; align-i
 .quick-actions button strong { font-size: 8px; align-self: end; }
 .quick-actions button small { font-size: 7px; color: var(--muted); }
 
+/* Almanaque diario en Resumen */
+.daily-calendar { margin-top: 16px; overflow: hidden; }
+.daily-calendar-header { padding: 16px 20px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.daily-nav-group, .daily-controls-group { display: flex; align-items: center; gap: 10px; }
+.daily-date-title { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); min-width: 190px; justify-content: center; }
+.today-pill { padding: 2px 8px; border-radius: 999px; background: var(--coral-soft); color: var(--coral-dark); font-size: 10px; font-weight: 700; }
+
+.cal-nav-btn { width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 6px; background: var(--white); display: grid; place-items: center; color: var(--ink); cursor: pointer; }
+.cal-nav-btn svg { transform: rotate(90deg); }
+.cal-nav-btn.next svg { transform: rotate(-90deg); }
+.cal-nav-btn:hover { border-color: var(--coral); color: var(--coral); }
+
+.cal-filter-select, .cal-date-picker { height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); font: 12px "DM Sans", sans-serif; color: var(--ink); outline: 0; }
+.cal-filter-select:focus, .cal-date-picker:focus { border-color: var(--coral); background: var(--white); }
+
+.daily-timeline { display: flex; flex-direction: column; }
+.timeline-row { display: grid; grid-template-columns: 72px 1fr; min-height: 54px; border-bottom: 1px solid var(--line); }
+.timeline-row:last-child { border-bottom: 0; }
+.timeline-hour { padding: 14px 12px; font-size: 11px; font-weight: 700; color: var(--muted); border-right: 1px solid var(--line); text-align: center; background: #fcfbfa; }
+.timeline-track { padding: 8px 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.timeline-empty { color: #d5cdc7; font-size: 12px; user-select: none; }
+
+.timeline-event { flex: 1 1 220px; max-width: 340px; padding: 8px 12px; border-radius: 7px; background: var(--coral-soft); border-left: 3px solid var(--coral); display: flex; flex-direction: column; gap: 2px; cursor: pointer; transition: transform .15s ease; }
+.timeline-event:hover { transform: translateY(-1px); }
+.timeline-event.pending { background: var(--ochre-soft); border-left-color: var(--ochre); }
+.timeline-event-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.timeline-event-top strong { font-size: 12px; color: var(--ink); }
+.timeline-event-top span { font-size: 10px; font-weight: 700; color: var(--coral-dark); }
+.timeline-event.pending .timeline-event-top span { color: var(--ochre); }
+.timeline-event small { font-size: 11px; color: var(--muted); }
+
 /* Adaptación a tablet y pantallas medianas */
 @media (max-width: 1000px) {
   .main-nav { display: none; }
@@ -340,6 +430,35 @@ footer { height: 85px; border-top: 1px solid var(--line); display: flex; align-i
   .quick-actions { grid-template-columns: 1fr; }
   .quick-actions > span { grid-column: auto; }
 }
+
+/* Escala tipográfica general del panel administrativo */
+.admin-shell { font-size: 14px; }
+
+.admin-brand strong { font-size: 16px; }
+.admin-brand small { font-size: 12px; }
+.admin-nav button { font-size: 14px; }
+
+.welcome h2 { font-size: 24px; }
+.welcome p { font-size: 14px; }
+
+.metric-card span { font-size: 13px; }
+.metric-card strong { font-size: 28px; }
+.metric-card small { font-size: 12px; }
+
+.panel-header h3 { font-size: 16px; }
+.data-table th { font-size: 12px; }
+.data-table td { font-size: 14px; }
+.badge { font-size: 12px; padding: 4px 10px; }
+.table-btn, .primary-button { font-size: 13px; }
+
+/* Almanaque diario */
+.daily-date-title { font-size: 16px; }
+.today-pill { font-size: 12px; }
+.cal-filter-select, .cal-date-picker { height: 38px; font-size: 14px; }
+
+/* Formularios y modales */
+.admin-form label span { font-size: 13px; }
+.admin-form input, .admin-form select { height: 42px; font-size: 14px; }
 
 /* Ajustes para móviles pequeños */
 @media (max-width: 440px) {
