@@ -299,10 +299,7 @@ export const AdminDashboardPage = () => {
         {seccion === "inicio" && (
           <>
             <h1>Resumen general</h1>
-            <p>
-              Consultá el estado de los centros registrados
-              en Agendia.
-            </p>
+            
 
             {cargando && <p>Cargando información...</p>}
 

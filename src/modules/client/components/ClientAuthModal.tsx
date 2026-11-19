@@ -1,27 +1,36 @@
 import { Icon } from "@/components/Icon";
-import { type SubmitEvent, useState } from "react";
-import { ClientUser } from "../types/ClientUser";
+import { type SubmitEvent, useEffect, useState } from "react";
+import { type ClientUser } from "../types/ClientUser";
+import { apiRequest, ApiError } from "@/services/api";
 import "./ClientAuthModal.css";
 
 export type AuthModalIntent = "login" | "booking";
-type AuthStep = "email" | "login" | "register"; // a futuro: | "verify"
+type AuthStep = "email" | "login" | "register";
 
 interface ClientAuthModalProps {
   isOpen: boolean;
   intent: AuthModalIntent;
+  initialMode?: "login" | "register";
   businessId: string;
   businessName: string;
   onClose: () => void;
   onSuccess: (user: ClientUser) => void;
 }
 
-// Temporal para probar el flujo hasta conectar el endpoint GET/POST check-email
-const MOCK_REGISTERED_EMAILS = ["ana@mail.com", "cliente@almaestetica.com"];
+interface LoginResult {
+  token: string;
+  usuario: { id: number; nombre: string; email: string; rol: string; centro_id: number };
+}
+
+const initials = (fullName: string) => fullName.trim().split(/\s+/).slice(0, 2)
+  .map((part) => part.charAt(0).toUpperCase()).join("") || "CL";
+
 
 export const ClientAuthModal = ({
   isOpen,
   intent,
-  businessId,
+  initialMode = "login",
+  businessId: _businessId,
   businessName,
   onClose,
   onSuccess,
@@ -34,16 +43,40 @@ export const ClientAuthModal = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (isOpen) {
+      setStep(initialMode);
+      setEmail("");
+      setName("");
+      setPassword("");
+      setConfirmPassword("");
+      setError(null);
+    }
+  }, [isOpen, initialMode]);
+
   if (!isOpen) return null;
 
-  const getInitials = (fullName: string) =>
-    fullName
-      .trim()
-      .split(" ")
-      .map((n) => n[0])
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "CL";
+  // La ruta pública del proyecto es /:businessSlug.
+  const slug = decodeURIComponent(window.location.pathname.split("/").filter(Boolean)[0] || "");
+  const base = `/auth/centros/${encodeURIComponent(slug)}`;
+
+  const completarLogin = (respuesta: LoginResult) => {
+    if (respuesta.usuario.rol !== "CLIENTE") {
+      throw new Error("Esta pantalla es exclusiva para clientes.");
+    }
+    sessionStorage.setItem(`agendia_cliente_token_${slug}`, respuesta.token);
+    sessionStorage.setItem(`agendia_cliente_usuario_${slug}`, JSON.stringify(respuesta.usuario));
+    const nombre = respuesta.usuario.nombre;
+    onSuccess({ id: String(respuesta.usuario.id), name: nombre,
+      initials: initials(nombre), email: respuesta.usuario.email });
+    setStep("email");
+    setPassword("");
+    setConfirmPassword("");
+  };
+
+  const mostrarError = (e: unknown) => {
+    setError(e instanceof Error ? e.message : "No se pudo completar la operación.");
+  };
 
   const resetAndClose = () => {
     setStep("email");
@@ -60,93 +93,62 @@ export const ClientAuthModal = ({
     setError(null);
   };
 
-  // Paso 1: Verificar si el correo existe en la BD del negocio
-  const handleCheckEmail = async (e: SubmitEvent<HTMLFormElement>) => {
+  // El backend no tiene check-email público. El usuario elige ingresar o registrarse.
+  const handleCheckEmail = (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail) return;
-
-    setLoading(true);
+    if (!email.trim()) return;
+    setEmail(email.trim().toLowerCase());
     setError(null);
-
-    try {
-      // TODO: Reemplazar por llamada real al backend:
-      // const { exists } = await api.post("/auth/check-email", { businessId, email: normalizedEmail });
-      await new Promise((resolve) => setTimeout(resolve, 250));
-      const exists = MOCK_REGISTERED_EMAILS.includes(normalizedEmail);
-
-      setEmail(normalizedEmail);
-      setStep(exists ? "login" : "register");
-    } catch {
-      setError("No pudimos verificar tu correo. Intentá nuevamente.");
-    } finally {
-      setLoading(false);
-    }
+    setStep("login");
   };
 
-  // Paso 2A: Login con email + contraseña -> devuelve JWT y ClientUser
   const handleLoginSubmit = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!password) return;
-
     setLoading(true);
     setError(null);
-
     try {
-      // TODO: Reemplazar por llamada real al backend:
-      // const { token, user } = await api.post("/auth/login", { businessId, email, password });
-      // localStorage.setItem("client_token", token);
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      const fallbackName = email.split("@")[0];
-      onSuccess({
-        name: fallbackName.charAt(0).toUpperCase() + fallbackName.slice(1),
-        initials: getInitials(fallbackName),
-        email,
+      const respuesta = await apiRequest<LoginResult>(`${base}/login`, {
+        method: "POST", body: JSON.stringify({ email, password }),
       });
-      setStep("email");
-      setPassword("");
-    } catch {
-      setError("Contraseña incorrecta. Revisala e intentá de nuevo.");
-    } finally {
-      setLoading(false);
-    }
+      completarLogin(respuesta);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        setError("Correo o contraseña incorrectos. Si todavía no tenés cuenta, elegí Registrarme.");
+      } else mostrarError(e);
+    } finally { setLoading(false); }
   };
 
-  // Paso 2B: Registro con nombre + email + contraseña -> devuelve JWT y ClientUser
   const handleRegisterSubmit = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
-
-    if (!name.trim() || !password) return;
+    if (name.trim().length < 3) {
+      setError("El nombre debe tener al menos 3 caracteres.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
     if (password !== confirmPassword) {
       setError("Las contraseñas no coinciden.");
       return;
     }
-
     setLoading(true);
-    setError(null);
-
     try {
-      // TODO: Reemplazar por llamada real al backend:
-      // const { token, user } = await api.post("/auth/register", { businessId, name: name.trim(), email, password });
-      // Cuando implementes OTP en el backend, acá pasarías a setStep("verify") antes de llamar a onSuccess
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      const cleanName = name.trim();
-      onSuccess({
-        name: cleanName,
-        initials: getInitials(cleanName),
-        email,
+      await apiRequest(`${base}/registro`, {
+        method: "POST",
+        body: JSON.stringify({ nombre: name.trim(), email: email.trim().toLowerCase(), password }),
       });
-      setStep("email");
-      setPassword("");
-      setConfirmPassword("");
-    } catch {
-      setError("No pudimos crear tu cuenta. Intentá nuevamente.");
-    } finally {
-      setLoading(false);
-    }
+      const respuesta = await apiRequest<LoginResult>(`${base}/login`, {
+        method: "POST", body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+      });
+      completarLogin(respuesta);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        setError("Este correo ya está registrado en el centro. Elegí Iniciar sesión.");
+      } else mostrarError(e);
+    } finally { setLoading(false); }
   };
 
   const titleByStep: Record<AuthStep, string> = {
@@ -197,18 +199,23 @@ export const ClientAuthModal = ({
             <button type="submit" className="primary-button" disabled={loading}>
               {loading ? "Verificando..." : <>Continuar <Icon name="arrow" /></>}
             </button>
+            <button type="button" className="modal-link-btn" onClick={() => { setStep("register"); setError(null); }}>
+              ¿Todavía no tenés cuenta? Registrarme
+            </button>
           </form>
         )}
 
         {/* Paso 2A: Usuario existente -> Contraseña */}
         {step === "login" && (
           <form onSubmit={handleLoginSubmit} className="modal-form">
-            <div className="modal-email-pill">
-              <span>{email}</span>
-              <button type="button" className="modal-link-btn" onClick={handleChangeEmail}>
-                Cambiar
-              </button>
-            </div>
+            <input
+              type="email"
+              placeholder="Tu correo electrónico"
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); setError(null); }}
+              autoComplete="email"
+              required
+            />
 
             <input
               type="password"
@@ -222,21 +229,26 @@ export const ClientAuthModal = ({
             <button type="submit" className="primary-button" disabled={loading}>
               {loading ? "Ingresando..." : <>{submitLabel} <Icon name="arrow" /></>}
             </button>
+            <button type="button" className="modal-link-btn" onClick={() => { setStep("register"); setError(null); }}>
+              ¿No tenés cuenta? Registrarme
+            </button>
           </form>
         )}
 
         {/* Paso 2B: Usuario nuevo -> Aviso + Nombre + Contraseña */}
         {step === "register" && (
           <form onSubmit={handleRegisterSubmit} className="modal-form">
-            <div className="modal-email-pill">
-              <span>{email}</span>
-              <button type="button" className="modal-link-btn" onClick={handleChangeEmail}>
-                Cambiar
-              </button>
-            </div>
+            <input
+              type="email"
+              placeholder="Tu correo electrónico"
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); setError(null); }}
+              autoComplete="email"
+              required
+            />
 
             <p className="modal-notice">
-              No encontramos una cuenta con este correo. Completá tus datos para registrarte.
+              Completá tus datos para crear una cuenta en este centro.
             </p>
 
             <input
@@ -255,7 +267,7 @@ export const ClientAuthModal = ({
                 setPassword(e.target.value);
                 if (error) setError(null);
               }}
-              minLength={8}
+              minLength={6}
               required
             />
             <input
@@ -266,12 +278,15 @@ export const ClientAuthModal = ({
                 setConfirmPassword(e.target.value);
                 if (error) setError(null);
               }}
-              minLength={8}
+              minLength={6}
               required
             />
             {error && <p className="modal-error">{error}</p>}
             <button type="submit" className="primary-button" disabled={loading}>
               {loading ? "Creando cuenta..." : <>{submitLabel} <Icon name="arrow" /></>}
+            </button>
+            <button type="button" className="modal-link-btn" onClick={() => { setStep("login"); setError(null); }}>
+              ¿Ya tenés cuenta? Iniciar sesión
             </button>
           </form>
         )}

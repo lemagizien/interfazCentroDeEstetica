@@ -1,14 +1,14 @@
 // src/modules/owner/OwnerDashboardPage.tsx
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useState, useRef, FormEvent } from "react";
 import { Brand } from "../../../components/Brand";
 import { Icon, IconName } from "../../../components/Icon";
 
-import { MOCK_ALMAESTETICA } from "@/data/mockBusiness";
 import { authService } from "../../../services/auth.service";
 import { apiRequest } from "../../../services/api";
 import { adminCentroService, type ServicioCentro as ServicioCentroAPI, type ProfesionalCentro as ProfesionalCentroAPI } from "../../../services/admin-centro.service";
 import { ServiciosCentroSection } from "./ServiciosCentroSection";
 import { ProfesionalesCentroSection } from "./ProfesionalesCentroSection";
+import { BannerCentroSection } from "./BannerCentroSection";
 
 interface OwnerDashboardViewProps {
   onLogout: () => void;
@@ -129,40 +129,98 @@ const getInitials = (fullName: string) =>
     .join("") || "US";
 
 export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
-  const initialBiz = MOCK_ALMAESTETICA[0];
   const tokenAdminCentro = authService.obtenerTokenAdmin();
 
   const [active, setActive] = useState<Section>("Resumen");
   const [centerMenuOpen, setCenterMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Estados principales (listos para reemplazar por fetch/API)
-  const [centerInfo, setCenterInfo] = useState({
-    name: initialBiz.name,
-    tagline: initialBiz.tagline,
-    address: initialBiz.address,
-    phone: "+54 11 4823-9100",
-  });
+  const navegarA = (seccion: Section) => {
+    setActive(seccion);
+    setMobileMenuOpen(false);
+    setCenterMenuOpen(false);
+  };
 
-  const [profileInfo, setProfileInfo] = useState({
-    name: "María González",
-    email: "maria@almaestetica.com",
-    role: "Administradora",
-  });
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const cerrarConEscape = (evento: KeyboardEvent) => {
+      if (evento.key === "Escape") setMobileMenuOpen(false);
+    };
+    window.addEventListener("keydown", cerrarConEscape);
+    return () => window.removeEventListener("keydown", cerrarConEscape);
+  }, [mobileMenuOpen]);
 
-  const todayISO = getTodayISO();
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 841px)");
+    const cerrarEnEscritorio = () => { if (media.matches) setMobileMenuOpen(false); };
+    cerrarEnEscritorio();
+    media.addEventListener("change", cerrarEnEscritorio);
+    return () => media.removeEventListener("change", cerrarEnEscritorio);
+  }, []);
+
+  // Datos reales del centro y del administrador autenticado.
+  const [centerInfo, setCenterInfo] = useState({ name: "", tagline: "", address: "", phone: "" });
+  const [profileInfo, setProfileInfo] = useState({ name: "", email: "", role: "Administrador" });
+  const [resumenCargando, setResumenCargando] = useState(true);
+  const [resumenError, setResumenError] = useState("");
+  const [serviciosActivos, setServiciosActivos] = useState(0);
+  const [profesionalesActivos, setProfesionalesActivos] = useState(0);
+  const [profesionalesFiltro, setProfesionalesFiltro] = useState<{ id: number; name: string }[]>([]);
+  const [todayISO, setTodayISO] = useState(getTodayISO);
+  const [preciosPorServicio, setPreciosPorServicio] = useState<Record<number, number>>({});
+  const [turnosOriginales, setTurnosOriginales] = useState<{
+    id: number;
+    fecha_hora_inicio: string;
+    estado: string;
+    servicio_id?: number;
+    servicio?: {
+      id?: number;
+      precio?: number | string;
+    };
+  }[]>([]);
+  useEffect(() => {
+    if (!tokenAdminCentro) {
+      setResumenError("No se encontró una sesión de administrador.");
+      setResumenCargando(false);
+      return;
+    }
+    let vigente = true;
+    setResumenCargando(true);
+    setResumenError("");
+    Promise.all([
+      apiRequest<{ status: string; data: { id?: number; nombre: string; slug: string; direccion?: string; telefono?: string } }>("/centros/mi-centro", { token: tokenAdminCentro }),
+      apiRequest<{ nombre: string; email: string; rol: string; centro_id: number }>("/auth/perfil", { token: tokenAdminCentro }),
+      adminCentroService.listarServicios(tokenAdminCentro),
+      adminCentroService.listarProfesionales(tokenAdminCentro),
+    ]).then(([centro, usuario, servicios, profesionales]) => {
+      if (!vigente) return;
+      const partesRuta = window.location.pathname.split("/").filter(Boolean);
+      const slugRuta = partesRuta[0] === "centros" && partesRuta[2] === "admin" ? partesRuta[1] : undefined;
+      if (slugRuta && decodeURIComponent(slugRuta) !== centro.data.slug) {
+        throw new Error("El centro de la sesión no coincide con la URL. Cerrá sesión e ingresá nuevamente.");
+      }
+      if (typeof (centro.data as { id?: number }).id === "number" && usuario.centro_id !== (centro.data as { id?: number }).id) {
+        throw new Error("El usuario autenticado no pertenece al centro de la sesión.");
+      }
+      setCenterInfo({ name: centro.data.nombre, tagline: "", address: centro.data.direccion ?? "", phone: centro.data.telefono ?? "" });
+      setProfileInfo({ name: usuario.nombre, email: usuario.email, role: "Administrador" });
+      setServiciosActivos(servicios.filter((item) => item.activo).length);
+      setProfesionalesActivos(profesionales.filter((item) => item.activo).length);
+      setProfesionalesFiltro(profesionales.filter((item) => item.activo).map((item) => ({ id: item.id, name: [item.nombre, item.apellido].filter(Boolean).join(" ") })));
+      setPreciosPorServicio(Object.fromEntries(servicios.map((item) => [item.id, Number(item.precio) || 0])));
+    }).catch((error) => {
+      if (vigente) setResumenError(error instanceof Error ? error.message : "No se pudo cargar el resumen.");
+    }).finally(() => { if (vigente) setResumenCargando(false); });
+    return () => { vigente = false; };
+  }, [tokenAdminCentro]);
+
   const [selectedDate, setSelectedDate] = useState<string>(todayISO);
   const [proFilter, setProFilter] = useState<string>("all");
 
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
 
-  const [services, setServices] = useState<ServiceItem[]>(initialBiz.services);
-  const [professionals, setProfessionals] = useState<ProfessionalItem[]>(
-    initialBiz.professionals.map((pro, idx) => ({
-      ...pro,
-      days: idx === 1 ? ["Mar", "Mié", "Jue", "Vie", "Sáb"] : ["Lun", "Mar", "Mié", "Jue", "Vie"],
-      hours: idx === 2 ? "10:00 - 18:00" : "09:00 - 17:00",
-    }))
-  );
+  const [services, setServices] = useState<ServiceItem[]>([]);
+  const [professionals, setProfessionals] = useState<ProfessionalItem[]>([]);
 
   const [clientes, setClientes] = useState<ClienteCentro[]>([]);
   const [clientesCargando, setClientesCargando] = useState(false);
@@ -304,8 +362,9 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
     fecha_hora_inicio: string;
     estado: string;
     cliente?: { nombre: string };
-    servicio?: { nombre: string };
     profesional?: { nombre: string; apellido?: string };
+    servicio_id?: number;
+    servicio?: { id?: number; nombre: string; precio?: number | string };
   };
 
   const [turnosError, setTurnosError] = useState("");
@@ -353,63 +412,133 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
     return () => { vigente = false; };
   }, [appointmentModal, tokenAdminCentro, turnoServicioId, turnoProfesionalId, turnoFecha]);
 
-  const cargarTurnos = async () => {
-    if (!tokenAdminCentro) return;
-    const lista = await apiRequest<TurnoAPI[]>("/turnos", { method: "GET", token: tokenAdminCentro });
-    setAppointments(lista.map((turno) => {
-      const fecha = new Date(turno.fecha_hora_inicio);
-      const partes = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "America/Argentina/Buenos_Aires",
-        year: "numeric", month: "2-digit", day: "2-digit",
-        hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-      }).formatToParts(fecha);
-      const parte = (tipo: string) => partes.find((p) => p.type === tipo)?.value ?? "";
-      const nombre = turno.cliente?.nombre ?? "Cliente sin datos";
-      return {
-        id: turno.id,
-        date: `${parte("year")}-${parte("month")}-${parte("day")}`,
-        time: `${parte("hour")}:${parte("minute")}`,
-        client: nombre,
-        service: turno.servicio?.nombre ?? "—",
-        pro: [turno.profesional?.nombre, turno.profesional?.apellido].filter(Boolean).join(" ") || "—",
-        status: turno.estado,
-        initials: getInitials(nombre),
-      };
-    }));
+  // Un solo normalizador para la carga inicial, polling y cambios locales.
+  type RespuestaTurnos = TurnoAPI[] | { data: TurnoAPI[] };
+  const normalizarTurnos = (respuesta: RespuestaTurnos): TurnoAPI[] => {
+    const lista = Array.isArray(respuesta) ? respuesta : respuesta?.data;
+    if (!Array.isArray(lista)) throw new Error("La respuesta de turnos no tiene el formato esperado.");
+    return lista;
   };
 
+  const esTurnoActivo = (turno: TurnoAPI) =>
+    !String(turno.estado ?? "").trim().toLowerCase().startsWith("cancel");
+
+  const convertirTurno = (turno: TurnoAPI): AppointmentItem => {
+    const fecha = new Date(turno.fecha_hora_inicio);
+    if (Number.isNaN(fecha.getTime())) throw new Error("Un turno tiene una fecha inválida.");
+    const partes = new Intl.DateTimeFormat("en-CA", {
+      timeZone: ZONA_ARGENTINA,
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    }).formatToParts(fecha);
+    const parte = (tipo: string) => partes.find((p) => p.type === tipo)?.value ?? "";
+    const nombre = turno.cliente?.nombre ?? "Cliente sin datos";
+    return {
+      id: turno.id,
+      date: `${parte("year")}-${parte("month")}-${parte("day")}`,
+      time: `${parte("hour")}:${parte("minute")}`,
+      client: nombre,
+      service: turno.servicio?.nombre ?? "—",
+      pro: [turno.profesional?.nombre, turno.profesional?.apellido].filter(Boolean).join(" ") || "—",
+      status: turno.estado,
+      initials: getInitials(nombre),
+    };
+  };
+
+  // Evita que una respuesta anterior pise una actualización más reciente.
+  const versionTurnos = useRef(0);
+  const consultaEnCurso = useRef(false);
+  const cargarTurnos = async () => {
+    if (!tokenAdminCentro) return;
+    const version = ++versionTurnos.current;
+    const respuesta = await apiRequest<RespuestaTurnos>("/turnos", { method: "GET", token: tokenAdminCentro });
+    const lista = normalizarTurnos(respuesta);
+    const visibles = lista.filter(esTurnoActivo).map(convertirTurno);
+    if (version !== versionTurnos.current) return;
+    setTurnosOriginales(lista);
+    setAppointments(visibles);
+    setTurnosError("");
+  };
+
+  // Actualización silenciosa: no limpia datos existentes, formularios ni filtros.
+  useEffect(() => {
+    if (!tokenAdminCentro) {
+      setTurnosCargando(false);
+      setTurnosError("No se encontró una sesión de administrador.");
+      return;
+    }
+    let vigente = true;
+    const actualizar = async () => {
+      if (!vigente || document.visibilityState === "hidden" || consultaEnCurso.current) return;
+      consultaEnCurso.current = true;
+      try {
+        await cargarTurnos();
+      } catch (error) {
+        if (vigente) setTurnosError(error instanceof Error ? error.message : "No se pudo actualizar la agenda.");
+      } finally {
+        consultaEnCurso.current = false;
+        if (vigente) setTurnosCargando(false);
+      }
+    };
+    setTurnosCargando(true);
+    void actualizar();
+    const intervalo = window.setInterval(() => { void actualizar(); }, 10000);
+    const alVolver = () => { if (document.visibilityState === "visible") void actualizar(); };
+    window.addEventListener("focus", alVolver);
+    document.addEventListener("visibilitychange", alVolver);
+    return () => {
+      vigente = false;
+      // Invalida respuestas de la instancia desmontada (incluye React StrictMode).
+      versionTurnos.current++;
+      consultaEnCurso.current = false;
+      window.clearInterval(intervalo);
+      window.removeEventListener("focus", alVolver);
+      document.removeEventListener("visibilitychange", alVolver);
+    };
+  }, [tokenAdminCentro]);
+
+  // Estadísticas y filtros actualizados también cuando cambian servicios o profesionales.
   useEffect(() => {
     if (!tokenAdminCentro) return;
     let vigente = true;
-    setTurnosCargando(true);
-    apiRequest<TurnoAPI[]>("/turnos", { method: "GET", token: tokenAdminCentro })
-      .then((lista) => {
+    let enCurso = false;
+    const actualizarCatalogo = async () => {
+      if (!vigente || enCurso || document.visibilityState === "hidden") return;
+      enCurso = true;
+      try {
+        const [servicios, profesionales] = await Promise.all([
+          adminCentroService.listarServicios(tokenAdminCentro),
+          adminCentroService.listarProfesionales(tokenAdminCentro),
+        ]);
         if (!vigente) return;
-        setAppointments(lista.map((turno) => {
-          const fecha = new Date(turno.fecha_hora_inicio);
-          const partes = new Intl.DateTimeFormat("en-CA", {
-            timeZone: "America/Argentina/Buenos_Aires",
-            year: "numeric", month: "2-digit", day: "2-digit",
-            hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-          }).formatToParts(fecha);
-          const parte = (tipo: string) => partes.find((p) => p.type === tipo)?.value ?? "";
-          const nombre = turno.cliente?.nombre ?? "Cliente sin datos";
-          return {
-            id: turno.id,
-            date: `${parte("year")}-${parte("month")}-${parte("day")}`,
-            time: `${parte("hour")}:${parte("minute")}`,
-            client: nombre,
-            service: turno.servicio?.nombre ?? "—",
-            pro: [turno.profesional?.nombre, turno.profesional?.apellido].filter(Boolean).join(" ") || "—",
-            status: turno.estado,
-            initials: getInitials(nombre),
-          };
-        }));
-      })
-      .catch((error) => { if (vigente) setTurnosError(error instanceof Error ? error.message : "Error al cargar turnos."); })
-      .finally(() => { if (vigente) setTurnosCargando(false); });
-    return () => { vigente = false; };
+        setServiciosActivos(servicios.filter((item) => item.activo).length);
+        setProfesionalesActivos(profesionales.filter((item) => item.activo).length);
+        setProfesionalesFiltro(profesionales.filter((item) => item.activo).map((item) => ({
+          id: item.id, name: [item.nombre, item.apellido].filter(Boolean).join(" "),
+        })));
+        setPreciosPorServicio(Object.fromEntries(servicios.map((item) => [item.id, Number(item.precio) || 0])));
+      } catch (error) {
+        // La carga inicial muestra errores; un fallo temporal de polling conserva los datos anteriores.
+        console.error("No se pudieron actualizar las estadísticas del centro:", error);
+      } finally { enCurso = false; }
+    };
+    const actualizarAlVolver = () => { if (document.visibilityState === "visible") void actualizarCatalogo(); };
+    const intervalo = window.setInterval(() => { void actualizarCatalogo(); }, 10000);
+    window.addEventListener("focus", actualizarAlVolver);
+    document.addEventListener("visibilitychange", actualizarAlVolver);
+    return () => {
+      vigente = false;
+      window.clearInterval(intervalo);
+      window.removeEventListener("focus", actualizarAlVolver);
+      document.removeEventListener("visibilitychange", actualizarAlVolver);
+    };
   }, [tokenAdminCentro]);
+
+  // El cambio de día en Argentina se refleja sin necesidad de recargar la página.
+  useEffect(() => {
+    const intervalo = window.setInterval(() => setTodayISO(getTodayISO()), 30000);
+    return () => window.clearInterval(intervalo);
+  }, []);
 
   const abrirNuevoTurno = async () => {
     if (!tokenAdminCentro) return;
@@ -442,9 +571,8 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
       setTurnosError("Seleccioná un cliente de los resultados de búsqueda.");
       return;
     }
-    const fecha = turnoFecha;
     const hora = turnoHorario;
-    if (!fecha || !hora || !turnoServicioId || !turnoProfesionalId) {
+    if (!turnoFecha || !hora || !turnoServicioId || !turnoProfesionalId) {
       setTurnosError("Completá la fecha, el horario, el servicio y el profesional.");
       return;
     }
@@ -480,6 +608,8 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
     setTurnosError("");
     try {
       await apiRequest(`/turnos/${id}`, { method: "DELETE", token: tokenAdminCentro });
+      setAppointments((actuales) => actuales.filter((turno) => turno.id !== id));
+      setTurnosOriginales((actuales) => actuales.filter((turno) => turno.id !== id));
       await cargarTurnos();
       notifySaved("Turno cancelado correctamente.");
     } catch (error) {
@@ -545,16 +675,37 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
     setProfessionals((prev) => prev.filter((p) => p.id !== id));
   };
 
-  const pendingCount = appointments.filter((a) => a.status === "Pendiente").length;
+  const turnosHoy = appointments.filter((a) => a.date === todayISO && !["cancelado", "cancelada"].includes(a.status.toLowerCase()));
+  const pendingCount = turnosHoy.filter((a) => ["pendiente", "reservado"].includes(a.status.toLowerCase())).length;
+  const ingresosHoy = turnosOriginales.filter((turno) => {
+    const fecha = new Intl.DateTimeFormat("en-CA", { timeZone: ZONA_ARGENTINA, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(turno.fecha_hora_inicio));
+    return fecha === todayISO && !["cancelado", "cancelada"].includes(turno.estado.toLowerCase());
+  }).reduce((total, turno) => total + (Number(turno.servicio?.precio) || preciosPorServicio[turno.servicio_id ?? turno.servicio?.id ?? -1] || 0), 0);
   const dayAppointments = appointments.filter(
-  (a) =>
-    a.date === selectedDate &&
-    (proFilter === "all" || a.pro === proFilter)
+    (a) =>
+      a.date === selectedDate &&
+      (proFilter === "all" || a.pro === proFilter)
   );
 
   return (
     <div className="admin-app">
-      <aside className="sidebar">
+      {mobileMenuOpen && (
+        <button
+          type="button"
+          className="admin-mobile-overlay"
+          aria-label="Cerrar menú de navegación"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+      <aside id="admin-sidebar" className={`sidebar${mobileMenuOpen ? " sidebar-mobile-open" : ""}`}>
+        <button
+          type="button"
+          className="admin-mobile-close"
+          aria-label="Cerrar menú"
+          onClick={() => setMobileMenuOpen(false)}
+        >
+          <span aria-hidden="true">×</span>
+        </button>
         <Brand />
 
         {/* Tarjeta del centro activo con desplegable hacia "Mi centro" */}
@@ -577,8 +728,7 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
               <button
                 type="button"
                 onClick={() => {
-                  setActive("Mi centro");
-                  setCenterMenuOpen(false);
+                  navegarA("Mi centro");
                 }}
               >
                 <Icon name="home" size={15} />
@@ -593,7 +743,7 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
           {nav.map(([label, icon]) => (
             <button
               key={label}
-              onClick={() => setActive(label)}
+              onClick={() => navegarA(label)}
               className={active === label ? "active" : ""}
             >
               <Icon name={icon} />
@@ -604,14 +754,14 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
 
           <small>CONFIGURACIÓN</small>
           <button
-            onClick={() => setActive("Mi perfil")}
+            onClick={() => navegarA("Mi perfil")}
             className={active === "Mi perfil" ? "active" : ""}
           >
             <Icon name="settings" />
             <span>Mi perfil</span>
           </button>
           <button
-            onClick={() => setActive("Clientes")}
+            onClick={() => navegarA("Clientes")}
             className={active === "Clientes" ? "active" : ""}
           >
             <Icon name="user" />
@@ -627,12 +777,19 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
 
       <main className="admin-main">
         <header className="admin-header">
-          <button className="mobile-menu">
+          <button
+            type="button"
+            className="mobile-menu"
+            aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="admin-sidebar"
+            onClick={() => setMobileMenuOpen((abierto) => !abierto)}
+          >
             <Icon name="menu" />
           </button>
           <span>
             <h1>{active}</h1>
-            <p>Jueves, 18 de julio</p>
+            <p style={{ textTransform: "capitalize" }}>{formatDisplayDate(todayISO)}</p>
           </span>
           <div className="admin-profile">
             <span>
@@ -649,21 +806,23 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
           {/* ==================== 1. RESUMEN (Dashboard) ==================== */}
           {active === "Resumen" && (
             <>
-              <section className="welcome">
+              {resumenCargando && <p role="status">Cargando información real del centro...</p>}
+              {resumenError && <p role="alert" style={{ color: "#bd4b3b" }}>{resumenError}</p>}
+              {!resumenCargando && !resumenError && <section className="welcome">
                 <span>
                   <h2>Buen día, {profileInfo.name.split(" ")[0]}.</h2>
                   <p>Esto es lo que está pasando hoy en {centerInfo.name}.</p>
                 </span>
-              </section>
+              </section>}
 
-              <section className="metrics">
+              {!resumenCargando && !resumenError && <section className="metrics">
                 <article>
                   <span className="metric-icon coral">
                     <Icon name="calendar" />
                   </span>
                   <span>
                     <small>TURNOS DE HOY</small>
-                    <strong>{appointments.length}</strong>
+                    <strong>{turnosHoy.length}</strong>
                     <em>{pendingCount} pendientes</em>
                   </span>
                 </article>
@@ -673,7 +832,7 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
                   </span>
                   <span>
                     <small>SERVICIOS ACTIVOS</small>
-                    <strong>{services.length}</strong>
+                    <strong>{serviciosActivos}</strong>
                     <em>Catálogo disponible</em>
                   </span>
                 </article>
@@ -683,7 +842,7 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
                   </span>
                   <span>
                     <small>INGRESOS ESTIMADOS</small>
-                    <strong>$186.500</strong>
+                    <strong>{ingresosHoy.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 })}</strong>
                     <em>Agenda del día</em>
                   </span>
                 </article>
@@ -693,114 +852,113 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
                   </span>
                   <span>
                     <small>PROFESIONALES</small>
-                    <strong>{professionals.length}</strong>
+                    <strong>{profesionalesActivos}</strong>
                     <em>Activos en agenda</em>
                   </span>
                 </article>
-              </section>
+              </section>}
 
               <section className="panel daily-calendar">
-                    <div className="daily-calendar-header">
-                      <div className="daily-nav-group">
-                        <button
-                          type="button"
-                          className="cal-nav-btn"
-                          onClick={() => setSelectedDate((d) => shiftDateISO(d, -1))}
-                          title="Día anterior"
-                        >
-                          <Icon name="chevron" size={16} />
-                        </button>
+                <div className="daily-calendar-header">
+                  <div className="daily-nav-group">
+                    <button
+                      type="button"
+                      className="cal-nav-btn"
+                      onClick={() => setSelectedDate((d) => shiftDateISO(d, -1))}
+                      title="Día anterior"
+                    >
+                      <Icon name="chevron" size={16} />
+                    </button>
 
-                        <div className="daily-date-title">
-                          <strong style={{ textTransform: "capitalize" }}>
-                            {formatDisplayDate(selectedDate)}
-                          </strong>
-                          {selectedDate === todayISO && (
-                            <span className="today-pill">Hoy</span>
+                    <div className="daily-date-title">
+                      <strong style={{ textTransform: "capitalize" }}>
+                        {formatDisplayDate(selectedDate)}
+                      </strong>
+                      {selectedDate === todayISO && (
+                        <span className="today-pill">Hoy</span>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      className="cal-nav-btn next"
+                      onClick={() => setSelectedDate((d) => shiftDateISO(d, 1))}
+                      title="Día siguiente"
+                    >
+                      <Icon name="chevron" size={16} />
+                    </button>
+
+                    {selectedDate !== todayISO && (
+                      <button
+                        type="button"
+                        className="table-btn"
+                        onClick={() => setSelectedDate(todayISO)}
+                      >
+                        Volver a hoy
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="daily-controls-group">
+                    <select
+                      className="cal-filter-select"
+                      value={proFilter}
+                      onChange={(e) => setProFilter(e.target.value)}
+                    >
+                      <option value="all">Todos los profesionales</option>
+                      {profesionalesFiltro.map((p) => (
+                        <option key={p.id} value={p.name}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    <input
+                      type="date"
+                      className="cal-date-picker"
+                      value={selectedDate}
+                      onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
+                      aria-label="Elegir fecha"
+                    />
+                  </div>
+                </div>
+
+                <div className="daily-timeline">
+                  {HOURS_SLOTS.map((slot) => {
+                    const slotHour = slot.slice(0, 2);
+                    const slotItems = dayAppointments.filter((a) =>
+                      a.time.startsWith(slotHour)
+                    );
+
+                    return (
+                      <div className="timeline-row" key={slot}>
+                        <span className="timeline-hour">{slot}</span>
+
+                        <div className="timeline-track">
+                          {slotItems.length === 0 ? (
+                            <span className="timeline-empty">—</span>
+                          ) : (
+                            slotItems.map((appt) => (
+                              <div
+                                key={appt.id}
+                                className={`timeline-event ${appt.status === "Pendiente" ? "pending" : ""
+                                  }`}
+                              >
+                                <div className="timeline-event-top">
+                                  <strong>{appt.service}</strong>
+                                  <span>{appt.time}</span>
+                                </div>
+                                <small>
+                                  {appt.pro} · {appt.client}
+                                </small>
+                              </div>
+                            ))
                           )}
                         </div>
-
-                        <button
-                          type="button"
-                          className="cal-nav-btn next"
-                          onClick={() => setSelectedDate((d) => shiftDateISO(d, 1))}
-                          title="Día siguiente"
-                        >
-                          <Icon name="chevron" size={16} />
-                        </button>
-
-                        {selectedDate !== todayISO && (
-                          <button
-                            type="button"
-                            className="table-btn"
-                            onClick={() => setSelectedDate(todayISO)}
-                          >
-                            Volver a hoy
-                          </button>
-                        )}
                       </div>
-
-                      <div className="daily-controls-group">
-                        <select
-                          className="cal-filter-select"
-                          value={proFilter}
-                          onChange={(e) => setProFilter(e.target.value)}
-                        >
-                          <option value="all">Todos los profesionales</option>
-                          {professionals.map((p) => (
-                            <option key={p.id} value={p.name}>
-                              {p.name}
-                            </option>
-                          ))}
-                        </select>
-
-                        <input
-                          type="date"
-                          className="cal-date-picker"
-                          value={selectedDate}
-                          onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
-                          aria-label="Elegir fecha"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="daily-timeline">
-                      {HOURS_SLOTS.map((slot) => {
-                        const slotHour = slot.slice(0, 2);
-                        const slotItems = dayAppointments.filter((a) =>
-                          a.time.startsWith(slotHour)
-                        );
-
-                        return (
-                          <div className="timeline-row" key={slot}>
-                            <span className="timeline-hour">{slot}</span>
-
-                            <div className="timeline-track">
-                              {slotItems.length === 0 ? (
-                                <span className="timeline-empty">—</span>
-                              ) : (
-                                slotItems.map((appt) => (
-                                  <div
-                                    key={appt.id}
-                                    className={`timeline-event ${
-                                      appt.status === "Pendiente" ? "pending" : ""
-                                    }`}
-                                  >
-                                    <div className="timeline-event-top">
-                                      <strong>{appt.service}</strong>
-                                      <span>{appt.time}</span>
-                                    </div>
-                                    <small>
-                                      {appt.pro} · {appt.client}
-                                    </small>
-                                  </div>
-                                ))
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    );
+                  })}
+                </div>
               </section>
             </>
           )}
@@ -818,6 +976,8 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
                 </button>
               </section>
 
+              {turnosError && <p role="alert" style={{ color: "#bd4b3b" }}>{turnosError}</p>}
+              {turnosCargando && appointments.length === 0 && <p role="status">Cargando agenda...</p>}
               <section className="panel">
                 <div className="admin-table-wrap">
                   <table className="admin-table">
@@ -951,6 +1111,7 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
                   </div>
                 </form>
               </section>
+              {tokenAdminCentro && <BannerCentroSection token={tokenAdminCentro} />}
             </>
           )}
 
@@ -1223,8 +1384,8 @@ export const OwnerDashboardPage = ({ onLogout }: OwnerDashboardViewProps) => {
               {proModal.pro === "new"
                 ? "Nuevo profesional"
                 : proModal.tab === "disponibilidad"
-                ? `Disponibilidad — ${proModal.pro.name}`
-                : "Editar profesional"}
+                  ? `Disponibilidad — ${proModal.pro.name}`
+                  : "Editar profesional"}
             </h3>
             <form onSubmit={handleSaveProfessional} className="admin-form">
               <div className="form-grid-2">

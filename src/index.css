@@ -471,3 +471,110 @@ footer { height: 85px; border-top: 1px solid var(--line); display: flex; align-i
   .team-member { grid-template-columns: auto 1fr; }
   .capacity { display: none; }
 }
+
+/* Banner del centro a ancho completo, con texto legible sobre la imagen. */
+.hero.hero--full-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 430px;
+  isolation: isolate;
+  background: var(--cream);
+}
+.hero.hero--full-banner .hero-image {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.hero.hero--full-banner .hero-image::after {
+  content: none;
+}
+.hero.hero--full-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(90deg, rgba(243,237,230,.97) 0%, rgba(243,237,230,.90) 29%, rgba(243,237,230,.45) 56%, rgba(243,237,230,.03) 100%);
+}
+.hero.hero--full-banner .hero-copy {
+  position: relative;
+  width: min(620px, 100%);
+  padding: 75px max(7vw, 32px);
+}
+@media (max-width: 840px) {
+  .hero.hero--full-banner { min-height: 380px; }
+  .hero.hero--full-banner .hero-copy { padding: 65px 24px; }
+  .hero.hero--full-banner::before {
+    background: linear-gradient(90deg, rgba(243,237,230,.96), rgba(243,237,230,.70) 72%, rgba(243,237,230,.30));
+  }
+}
+/* =========================================
+   AGENDIA - PERSONALIZACIÓN DEL CENTRO
+   ========================================= */
+
+/* Campo de descripción del negocio */
+.admin-form textarea {
+  width: 100%;
+  min-height: 130px;
+  padding: 14px 16px;
+
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #333;
+
+  background-color: #fff;
+  border: 1px solid #e5ded8;
+  border-radius: 12px;
+
+  resize: vertical;
+  outline: none;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+/* Efecto al seleccionar el campo */
+.admin-form textarea:focus {
+  border-color: #d98f7c;
+  box-shadow: 0 0 0 3px rgba(217, 143, 124, 0.12);
+}
+
+/* Texto de ejemplo */
+.admin-form textarea::placeholder {
+  color: #aaa;
+}
+
+/* Campo deshabilitado */
+.admin-form textarea:disabled {
+  background-color: #f7f5f3;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Contador de caracteres y textos de ayuda */
+.admin-form label small,
+.admin-form .field-hint {
+  display: block;
+  margin-top: 6px;
+
+  font-size: 12px;
+  line-height: 1.4;
+  color: #8a817c;
+  text-align: right;
+}
+
+/* Ajustes para dispositivos móviles */
+@media (max-width: 768px) {
+  .admin-form textarea {
+    min-height: 110px;
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+}
